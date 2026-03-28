@@ -34,8 +34,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps): JSX.Element {
     <div className="auth-shell">
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="eyebrow">RelayDesk</div>
-        <h1>统一 Agent 工作台</h1>
-        <p className="muted">先用最小骨架打通登录、项目、会话和替身 AI Agent。</p>
+        <h1>多 Provider AI 协作平台</h1>
+        <p className="muted">先用最小骨架打通登录、项目、会话和替身 AI 协作链路。</p>
 
         <label>
           <span>邮箱</span>

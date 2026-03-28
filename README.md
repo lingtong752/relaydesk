@@ -1,6 +1,6 @@
 # RelayDesk
 
-RelayDesk 是一个面向开源协作的 AI Agent 工作台重写项目。它的目标不是单纯复制旧项目，而是用更清晰的前后端边界、MongoDB 主存储和可扩展的 Provider/替身 AI Agent 架构，重新实现一个适合长期演进和公开协作的产品基础。
+RelayDesk 是一个面向开源协作的多 Provider AI 协作平台。它聚合 Claude、Codex、Cursor、Gemini 等底层能力，并通过更清晰的前后端边界、MongoDB 主存储和可扩展的 Provider/替身 AI Agent 架构，为项目协作、流程控制和运行观察提供统一入口。
 
 ## 当前已实现
 
@@ -9,20 +9,20 @@ RelayDesk 是一个面向开源协作的 AI Agent 工作台重写项目。它的
 - JWT 鉴权
 - 项目、会话、消息、运行中的替身 AI Agent 骨架
 - 文件树与基础文本编辑器
-- 浏览器终端工作台
-- Git 状态与 diff 工作台
+- 浏览器终端
+- Git 状态与 diff 视图
 - 替身 AI Agent 审批面板与 approve/reject 主链路
 - 替身 AI Agent 人工接管与恢复运行主链路
-- WebSocket 自动重连与工作台状态回补
+- WebSocket 自动重连与页面状态回补
 - Claude 真实 Provider 首条接入链路
 - Codex 真实 Provider 首条接入链路
-- React + Vite 前端工作台
+- React + Vite 前端应用
 - 文档中心、路线图、API 规范和数据模型文档
 
 ## 当前限制
 
 - 真实 Provider 当前已接入 `claude` 和 `codex`，其余仍为占位适配
-- Git 工作台当前为只读基础版，尚未支持暂存、提交、分支管理
+- Git 能力当前为只读基础版，尚未支持暂存、提交、分支管理
 - 插件和任务系统尚未接入
 - 替身 AI Agent 还缺检查点级恢复和更细粒度的风险策略
 
@@ -48,7 +48,7 @@ RelayDesk 是一个面向开源协作的 AI Agent 工作台重写项目。它的
 ## 仓库结构
 
 - `apps/web`
-  React 前端工作台
+  React 前端应用
 - `apps/api`
   Fastify API 与 WebSocket 服务
 - `packages/shared`

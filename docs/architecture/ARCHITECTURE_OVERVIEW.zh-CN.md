@@ -7,7 +7,7 @@
 RelayDesk 采用前后端分离的模块化单体结构：
 
 - `apps/web`
-  React + Vite 前端工作台
+  React + Vite 前端应用
 - `apps/api`
   Fastify + WebSocket API 服务
 - `packages/shared`
@@ -33,8 +33,8 @@ RelayDesk 采用前后端分离的模块化单体结构：
 
 ## 4. 当前限制
 
-- Provider 仅为 `mock`
-- 文件树、终端、Git、插件尚未接入
+- Provider 当前已接入 `mock`、`claude`、`codex`，`cursor` 和 `gemini` 仍待补齐
+- 文件、终端、Git 基础能力已接入，插件和任务系统尚未接入
 - 运行事件还未沉淀为独立审计集合
 
 ## 5. 后续架构方向

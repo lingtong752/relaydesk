@@ -2,7 +2,7 @@
   "name": "relaydesk",
   "private": true,
   "version": "0.1.0",
-  "description": "A rebuilt open-source AI agent workspace with multi-provider chat, surrogate agent orchestration, and MongoDB-backed project state.",
+  "description": "An open-source multi-provider AI collaboration platform with surrogate agent orchestration and MongoDB-backed project state.",
   "license": "MIT",
   "engines": {
     "node": ">=22"

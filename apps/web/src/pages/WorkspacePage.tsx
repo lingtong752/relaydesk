@@ -41,7 +41,7 @@ function mergePendingApprovals(current: ApprovalRecord[], incoming: ApprovalReco
 export function WorkspacePage({ user }: WorkspacePageProps): JSX.Element {
   const { projectId = "" } = useParams();
   const token = authStorage.getToken();
-  const [projectName, setProjectName] = useState("工作台");
+  const [projectName, setProjectName] = useState("项目控制台");
   const [projectRootPath, setProjectRootPath] = useState("");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
@@ -93,7 +93,7 @@ export function WorkspacePage({ user }: WorkspacePageProps): JSX.Element {
       })
       .catch((requestError) => {
         if (!cancelled) {
-          setError(requestError instanceof Error ? requestError.message : "加载工作台失败");
+          setError(requestError instanceof Error ? requestError.message : "加载项目失败");
         }
       });
 
@@ -343,7 +343,7 @@ export function WorkspacePage({ user }: WorkspacePageProps): JSX.Element {
     <div className="workspace-shell">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="eyebrow">项目工作台</div>
+          <div className="eyebrow">项目控制台</div>
           <h2>{projectName}</h2>
           <p className="muted">{user.email}</p>
         </div>
