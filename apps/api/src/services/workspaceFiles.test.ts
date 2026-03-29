@@ -7,6 +7,7 @@ import {
   listWorkspaceFiles,
   readWorkspaceFile,
   resolveWorkspacePath,
+  searchWorkspaceFiles,
   saveWorkspaceFile
 } from "./workspaceFiles.js";
 
@@ -43,6 +44,16 @@ describe("listWorkspaceFiles", () => {
 
     expect(result.entries.map((entry) => entry.path)).toEqual(["src", "README.md"]);
   });
+
+  it("returns an empty list when the workspace root does not exist yet", async () => {
+    const missingRoot = path.join(os.tmpdir(), `relaydesk-missing-${Date.now()}`);
+    const result = await listWorkspaceFiles(missingRoot);
+
+    expect(result).toEqual({
+      currentPath: "",
+      entries: []
+    });
+  });
 });
 
 describe("saveWorkspaceFile and readWorkspaceFile", () => {
@@ -58,5 +69,26 @@ describe("saveWorkspaceFile and readWorkspaceFile", () => {
 
     expect(saved.path).toBe("notes/todo.md");
     expect(read.content).toBe("hello workspace");
+  });
+});
+
+describe("searchWorkspaceFiles", () => {
+  it("searches files by file name and nested path while skipping ignored folders", async () => {
+    const root = await createTempWorkspace();
+    await mkdir(path.join(root, "src", "features"), { recursive: true });
+    await mkdir(path.join(root, "node_modules", "left-pad"), { recursive: true });
+    await writeFile(path.join(root, "src", "features", "TerminalWorkspace.tsx"), "terminal", "utf8");
+    await writeFile(path.join(root, "src", "features", "FileWorkspace.tsx"), "files", "utf8");
+    await writeFile(path.join(root, "node_modules", "left-pad", "index.js"), "ignored", "utf8");
+
+    const results = await searchWorkspaceFiles({
+      rootPath: root,
+      query: "workspace"
+    });
+
+    expect(results.map((entry) => entry.path)).toEqual([
+      "src/features/FileWorkspace.tsx",
+      "src/features/TerminalWorkspace.tsx"
+    ]);
   });
 });

@@ -46,7 +46,7 @@
 - `npm run check`
   结果：通过
 - `npm run test`
-  结果：通过，当前共 7 个测试文件、17 个测试用例
+  结果：通过，当前共 11 个测试文件、26 个测试用例
 
 ### 3.2 运行验证
 
@@ -94,6 +94,8 @@
   结果：通过
 - Git diff 读取与提示逻辑测试
   结果：通过
+- Git 暂存、取消暂存、提交、分支切换单测
+  结果：通过
 - Git 状态 API 与前端面板构建验证
   结果：通过
 
@@ -123,6 +125,8 @@
   结果：通过
 - 工作台在重连后重新拉取项目和消息状态的类型与构建验证
   结果：通过
+- WebSocket 订阅、断开重连后重新订阅与项目事件回推集成测试
+  结果：通过
 
 ### 3.10 Claude Provider 基础验证
 
@@ -140,6 +144,64 @@
 - Codex provider 运行时类型与构建验证
   结果：通过
 - 前端 Codex 会话选择与构建验证
+  结果：通过
+
+### 3.12 运行检查点与审计事件验证
+
+- 运行轨迹写入 helper 单测
+  结果：通过
+- MongoDB 序列化与 API 类型验证
+  结果：通过
+- 前端运行轨迹面板构建验证
+  结果：通过
+
+### 3.13 API 集成与状态机验证
+
+- Fastify inject 鉴权、项目、会话、运行链路集成测试
+  结果：通过
+- 替身运行从 waiting_human -> running -> paused -> waiting_human -> stopped 状态流测试
+  结果：通过
+- 审计事件与检查点 API 查询测试
+  结果：通过
+- 从指定检查点恢复到 waiting_human 并重新生成审批测试
+  结果：通过
+
+### 3.14 Provider Core 验证
+
+- `provider-core` 适配器注册表测试
+  结果：通过
+- 占位 provider 回退到 unsupported adapter 测试
+  结果：通过
+- `mock` / `claude` / `codex` / `gemini` 历史消息映射兼容性测试
+  结果：通过
+
+### 3.15 Gemini Provider 基础验证
+
+- Gemini contents 历史映射逻辑单测
+  结果：通过
+- Gemini provider 运行时类型与构建验证
+  结果：通过
+
+### 3.16 Provider 失败场景验证
+
+- Claude 上游错误消息透传测试
+  结果：通过
+- Codex 空响应防御测试
+  结果：通过
+- Gemini 安全拦截错误提示测试
+  结果：通过
+- Provider 中止错误透传测试
+  结果：通过
+
+### 3.17 终端 WebSocket 集成验证
+
+- 终端会话 ready 事件测试
+  结果：通过
+- 终端输出写入与 backlog 回放测试
+  结果：通过
+- 终端断线重连后继续附着测试
+  结果：通过
+- 非法终端 payload 错误事件测试
   结果：通过
 
 本轮成功生成的示例实体：
@@ -160,20 +222,27 @@
 - 替身 AI Agent 的启动与停止骨架
 - 文件树与基础文本编辑器
 - 浏览器终端
-- Git 状态与 diff 视图
+- Git 状态、diff、暂存/提交、分支切换/创建基础能力
 - 替身 AI Agent 最小审批流
 - 替身 AI Agent 人工接管与恢复运行基础能力
+- 替身 AI Agent 运行检查点、审计事件与检查点级恢复能力
 - WebSocket 自动重连与状态回补基础能力
+- WebSocket 订阅与项目事件回推集成测试
+- 终端 WebSocket 重连与 backlog 回放集成测试
+- `provider-core` 统一 Provider 适配层
 - Claude 真实 Provider 首条链路
 - Codex 真实 Provider 首条链路
+- Gemini 真实 Provider 首条链路
+- 真实 Provider 失败场景基础测试
 
 ## 5. 已知缺口
 
-- 真实 Provider 当前已接入 Claude 和 Codex，Cursor、Gemini 仍未接入
-- Git 能力仅实现只读基础版，尚未支持提交、分支和远程操作
+- 真实 Provider 当前已接入 Claude、Codex 和 Gemini，Cursor 仍未接入，但底层适配层已统一抽离
+- Git 能力已支持本地提交和分支切换，尚未支持远程操作
 - 插件、任务系统尚未实现
-- 替身 AI Agent 尚未实现检查点恢复和更细粒度风险策略
-- 自动化测试仍偏基础，尚未覆盖 API 集成和替身状态机
+- 替身 AI Agent 尚未实现更细粒度风险策略和运行回放
+- 自动化测试已补 API、状态机、实时 WebSocket 与终端 WebSocket 协议层首条集成覆盖，但更复杂运行恢复场景仍偏基础
+- 真实 Provider 已补首轮失败场景测试，但尚未完成带真实凭证的在线联调记录
 
 ## 6. 下一步测试建议
 
@@ -183,3 +252,32 @@
 - 增加审批流接口与页面联调测试
 - 增加真实 Claude 联调报告
 - 增加真实 Codex 联调报告
+
+## 7. 2026-03-29 补充验证
+
+补充验证命令：
+
+- `npm run check`
+
+补充结果：
+
+- 结果：通过
+- 当前共 `37` 个测试文件、`83` 个测试用例
+- 前后端 `lint`、`typecheck`、`test`、`build` 全链路通过
+
+本轮新增覆盖重点：
+
+- CLI 历史会话导入、恢复与继续执行
+- Claude / Codex Settings、MCP 与工具权限写回
+- Git fetch / pull / push 远程同步
+- 多终端标签与重连回补
+- 插件安装、宿主上下文、本地 manifest 与受控动作执行
+- 任务工作台与 TaskMaster 只读摘要
+
+更新后的已知缺口：
+
+- `cursor` 近阶段仍不作为集成目标
+- Gemini Settings、MCP 与工具权限仍是只读摘要，尚未支持写回
+- 插件运行时当前仍是受控模式，尚未开放外部插件后端或更细粒度权限分级
+- 任务工作台当前仍为只读骨架，尚未落地内建任务持久化或 TaskMaster 双向同步
+- Web 构建已通过，但前端主包体积偏大，后续需要做分包优化

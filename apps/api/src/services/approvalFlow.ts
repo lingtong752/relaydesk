@@ -48,3 +48,9 @@ export function buildResumePendingMessage(objective: string): string {
   const summary = summarize(objective, 60) || "当前任务";
   return `已请求恢复替身 AI Agent 执行“${summary}”，正在等待新的人工审批。`;
 }
+
+export function buildRestorePendingMessage(objective: string, checkpointSummary: string): string {
+  const summary = summarize(objective, 60) || "当前任务";
+  const checkpointLabel = summarize(checkpointSummary, 48) || "最近检查点";
+  return `已从检查点“${checkpointLabel}”恢复替身 AI Agent 执行“${summary}”，正在等待新的人工审批。`;
+}

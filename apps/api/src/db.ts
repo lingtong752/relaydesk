@@ -1,9 +1,13 @@
 import { MongoClient, ObjectId, type Collection } from "mongodb";
 import type {
   ApprovalRecord,
+  AuditEventRecord,
   AuthUser,
   MessageRecord,
+  PluginActionRecord,
+  PluginInstallationRecord,
   ProjectRecord,
+  RunCheckpointRecord,
   RunRecord,
   SessionRecord
 } from "@shared";
@@ -30,6 +34,9 @@ export interface SessionDoc {
   projectId: ObjectId;
   provider: SessionRecord["provider"];
   title: string;
+  origin: SessionRecord["origin"];
+  externalSessionId?: string;
+  sourcePath?: string;
   status: SessionRecord["status"];
   createdAt: Date;
   updatedAt: Date;
@@ -75,6 +82,51 @@ export interface ApprovalDoc {
   resolvedAt?: Date;
 }
 
+export interface AuditEventDoc {
+  _id?: ObjectId;
+  projectId: ObjectId;
+  sessionId?: ObjectId;
+  runId?: ObjectId;
+  eventType: AuditEventRecord["eventType"];
+  actorType: AuditEventRecord["actorType"];
+  summary: string;
+  payload?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface RunCheckpointDoc {
+  _id?: ObjectId;
+  projectId: ObjectId;
+  sessionId: ObjectId;
+  runId: ObjectId;
+  runStatus: RunCheckpointRecord["runStatus"];
+  source: string;
+  summary: string;
+  messageId?: ObjectId;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface PluginInstallationDoc {
+  _id?: ObjectId;
+  projectId: ObjectId;
+  pluginId: string;
+  sourceType: PluginInstallationRecord["sourceType"];
+  sourceRef?: string | null;
+  name: string;
+  version: string;
+  description: string;
+  capabilities: string[];
+  tabTitle: string;
+  routeSegment: string;
+  frontendComponent: PluginInstallationRecord["frontendComponent"];
+  backendService: PluginInstallationRecord["backendService"];
+  actions: PluginActionRecord[];
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface DatabaseCollections {
   users: Collection<UserDoc>;
   projects: Collection<ProjectDoc>;
@@ -82,6 +134,9 @@ export interface DatabaseCollections {
   messages: Collection<MessageDoc>;
   runs: Collection<RunDoc>;
   approvals: Collection<ApprovalDoc>;
+  auditEvents: Collection<AuditEventDoc>;
+  runCheckpoints: Collection<RunCheckpointDoc>;
+  pluginInstallations: Collection<PluginInstallationDoc>;
 }
 
 export interface Database {
@@ -100,7 +155,10 @@ export async function connectDatabase(uri: string, dbName: string): Promise<Data
     sessions: db.collection<SessionDoc>("sessions"),
     messages: db.collection<MessageDoc>("messages"),
     runs: db.collection<RunDoc>("runs"),
-    approvals: db.collection<ApprovalDoc>("approvals")
+    approvals: db.collection<ApprovalDoc>("approvals"),
+    auditEvents: db.collection<AuditEventDoc>("audit_events"),
+    runCheckpoints: db.collection<RunCheckpointDoc>("run_checkpoints"),
+    pluginInstallations: db.collection<PluginInstallationDoc>("plugin_installations")
   };
 
   await collections.users.createIndex({ email: 1 }, { unique: true });
@@ -110,6 +168,11 @@ export async function connectDatabase(uri: string, dbName: string): Promise<Data
   await collections.runs.createIndex({ projectId: 1, status: 1, startedAt: -1 });
   await collections.approvals.createIndex({ projectId: 1, status: 1, createdAt: -1 });
   await collections.approvals.createIndex({ runId: 1, createdAt: -1 });
+  await collections.auditEvents.createIndex({ runId: 1, createdAt: -1 });
+  await collections.auditEvents.createIndex({ projectId: 1, createdAt: -1 });
+  await collections.runCheckpoints.createIndex({ runId: 1, createdAt: -1 });
+  await collections.runCheckpoints.createIndex({ projectId: 1, createdAt: -1 });
+  await collections.pluginInstallations.createIndex({ projectId: 1, pluginId: 1 }, { unique: true });
 
   return { client, collections };
 }
@@ -148,6 +211,9 @@ export function serializeSession(doc: SessionDoc): SessionRecord {
     projectId: doc.projectId.toHexString(),
     provider: doc.provider,
     title: doc.title,
+    origin: doc.origin,
+    externalSessionId: doc.externalSessionId,
+    sourcePath: doc.sourcePath,
     status: doc.status,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -197,5 +263,58 @@ export function serializeApproval(doc: ApprovalDoc): ApprovalRecord {
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
     resolvedAt: doc.resolvedAt?.toISOString()
+  };
+}
+
+export function serializeAuditEvent(doc: AuditEventDoc): AuditEventRecord {
+  return {
+    id: doc._id!.toHexString(),
+    projectId: doc.projectId.toHexString(),
+    sessionId: doc.sessionId?.toHexString(),
+    runId: doc.runId?.toHexString(),
+    eventType: doc.eventType,
+    actorType: doc.actorType,
+    summary: doc.summary,
+    payload: doc.payload,
+    createdAt: doc.createdAt.toISOString()
+  };
+}
+
+export function serializeRunCheckpoint(doc: RunCheckpointDoc): RunCheckpointRecord {
+  return {
+    id: doc._id!.toHexString(),
+    projectId: doc.projectId.toHexString(),
+    sessionId: doc.sessionId.toHexString(),
+    runId: doc.runId.toHexString(),
+    runStatus: doc.runStatus,
+    source: doc.source,
+    summary: doc.summary,
+    messageId: doc.messageId?.toHexString(),
+    metadata: doc.metadata,
+    createdAt: doc.createdAt.toISOString()
+  };
+}
+
+export function serializePluginInstallation(
+  doc: PluginInstallationDoc
+): PluginInstallationRecord {
+  return {
+    installationId: doc._id!.toHexString(),
+    projectId: doc.projectId.toHexString(),
+    id: doc.pluginId,
+    sourceType: doc.sourceType,
+    sourceRef: doc.sourceRef,
+    name: doc.name,
+    version: doc.version,
+    description: doc.description,
+    capabilities: doc.capabilities,
+    tabTitle: doc.tabTitle,
+    routeSegment: doc.routeSegment,
+    frontendComponent: doc.frontendComponent,
+    backendService: doc.backendService,
+    actions: doc.actions ?? [],
+    enabled: doc.enabled,
+    installedAt: doc.createdAt.toISOString(),
+    updatedAt: doc.updatedAt.toISOString()
   };
 }

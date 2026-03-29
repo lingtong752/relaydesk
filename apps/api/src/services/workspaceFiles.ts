@@ -62,7 +62,21 @@ export async function listWorkspaceFiles(
 ): Promise<{ currentPath: string; entries: WorkspaceFileEntry[] }> {
   const currentPath = normalizeRelativePath(relativePath);
   const absolutePath = resolveWorkspacePath(rootPath, currentPath);
-  const directoryEntries = await readdir(absolutePath, { withFileTypes: true });
+  let directoryEntries;
+  try {
+    directoryEntries = await readdir(absolutePath, { withFileTypes: true });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
+      return { currentPath, entries: [] };
+    }
+
+    throw error;
+  }
 
   const entries = await Promise.all(
     directoryEntries
@@ -89,6 +103,86 @@ export async function listWorkspaceFiles(
   });
 
   return { currentPath, entries };
+}
+
+export async function searchWorkspaceFiles(input: {
+  rootPath: string;
+  query: string;
+  limit?: number;
+}): Promise<WorkspaceFileEntry[]> {
+  const normalizedQuery = input.query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  const results: WorkspaceFileEntry[] = [];
+
+  async function visit(relativePath = ""): Promise<void> {
+    if (results.length >= limit) {
+      return;
+    }
+
+    const absolutePath = resolveWorkspacePath(input.rootPath, relativePath);
+    let directoryEntries;
+    try {
+      directoryEntries = await readdir(absolutePath, { withFileTypes: true });
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: string }).code === "ENOENT"
+      ) {
+        return;
+      }
+
+      throw error;
+    }
+
+    const sortedEntries = directoryEntries
+      .filter((entry) => !IGNORED_NAMES.has(entry.name))
+      .sort((left, right) => {
+        const leftKind = left.isDirectory() ? 0 : 1;
+        const rightKind = right.isDirectory() ? 0 : 1;
+        if (leftKind !== rightKind) {
+          return leftKind - rightKind;
+        }
+
+        return left.name.localeCompare(right.name);
+      });
+
+    for (const entry of sortedEntries) {
+      if (results.length >= limit) {
+        return;
+      }
+
+      const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        await visit(childRelativePath);
+        continue;
+      }
+
+      const normalizedPath = childRelativePath.replace(/\\/g, "/");
+      const haystack = `${entry.name} ${normalizedPath}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) {
+        continue;
+      }
+
+      const entryStat = await stat(path.join(absolutePath, entry.name));
+      results.push({
+        name: entry.name,
+        path: normalizedPath,
+        kind: "file",
+        size: entryStat.size,
+        updatedAt: entryStat.mtime.toISOString()
+      });
+    }
+  }
+
+  await visit("");
+  return results;
 }
 
 export async function readWorkspaceFile(

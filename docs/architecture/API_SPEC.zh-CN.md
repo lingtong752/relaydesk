@@ -1,6 +1,6 @@
 # RelayDesk API 规范
 
-最后更新：2026-03-28
+最后更新：2026-03-29
 
 ## 1. 说明
 
@@ -74,6 +74,11 @@
 说明：
 获取当前用户的项目列表。
 
+### `GET /api/projects/discovery`
+
+说明：
+扫描本机工作区与 provider 目录，返回可导入项目以及已关联的 RelayDesk 项目。
+
 ### `POST /api/projects`
 
 说明：
@@ -97,7 +102,13 @@
 - 当前项目
 - 项目下会话列表
 - 当前活跃运行
+- 最近一条运行
 - 当前待处理审批列表
+
+当前实现：
+
+- 会在 bootstrap 时自动同步发现到的 CLI 历史会话
+- 当前已支持 Claude / Codex / Gemini 的历史会话导入
 
 ## 5. 会话接口
 
@@ -114,8 +125,8 @@
 当前实现：
 
 - `mock` 会话会使用本地占位流式回复
-- `claude` 会话会通过 Anthropic Messages API 获取真实回复
-- `codex` 会话会通过 OpenAI Responses API 获取真实回复
+- `claude`、`codex` 和 `gemini` 会话支持 RelayDesk 新建会话与导入 CLI 会话两种入口
+- 对导入的 CLI 会话，消息发送会优先走本地 CLI session bridge
 - 其他 provider 标识暂保留为占位适配
 
 请求体：
@@ -139,9 +150,11 @@
 
 当前实现：
 
-- `mock`、`claude` 和 `codex` 已接通统一消息时间线
+- `mock`、`claude`、`codex` 和 `gemini` 已接通统一消息时间线
 - Claude 需要配置 `ANTHROPIC_API_KEY`
 - Codex 需要配置 `OPENAI_API_KEY`
+- Gemini 需要配置 `GEMINI_API_KEY`
+- 对导入的 CLI 会话会尝试直接恢复 provider 原生 session 并继续执行
 
 请求体：
 
@@ -172,7 +185,8 @@
 
 - 若会话 provider 为 `claude`，审批通过后将调用 Claude 生成真实回复
 - 若会话 provider 为 `codex`，审批通过后将调用 Codex 生成真实回复
-- 若未配置 Claude 凭证，请求会在消息时间线中以失败结果返回
+- 若会话 provider 为 `gemini`，审批通过后将调用 Gemini 生成真实回复
+- 若未配置对应 provider 凭证，请求会在消息时间线中以失败结果返回
 
 请求体：
 
@@ -199,6 +213,29 @@
 说明：
 恢复一个已暂停的运行。系统会重新创建待审批项，并将运行状态切换回 `waiting_human`。
 
+### `GET /api/runs/:runId/audit-events`
+
+说明：
+获取指定运行的最近审计事件列表，用于追踪创建、审批、接管、停止、完成等关键节点。
+
+### `GET /api/runs/:runId/checkpoints`
+
+说明：
+获取指定运行的最近检查点列表，用于后续恢复和运行回放。
+
+### `POST /api/runs/:runId/restore`
+
+说明：
+从指定检查点恢复一条已暂停、已停止、已完成或失败的运行。当前实现会为该运行重新创建待审批项，并将状态切换回 `waiting_human`。
+
+请求体：
+
+```json
+{
+  "checkpointId": "checkpoint-id"
+}
+```
+
 ## 7. 审批接口
 
 ### `GET /api/runs/:runId/approvals`
@@ -224,7 +261,80 @@
 说明：
 拒绝待处理审批，并停止对应运行。
 
-## 8. WebSocket 协议
+## 8. 设置接口
+
+### `GET /api/projects/:projectId/settings`
+
+说明：
+读取当前项目的本地 CLI 配置摘要，包括 provider 状态、MCP server、工具权限与配置来源。
+
+### `POST /api/projects/:projectId/settings/providers/:provider`
+
+说明：
+保存指定 provider 的配置并写回本地 CLI 配置目录。
+
+当前实现：
+
+- 已支持 `claude`
+- 已支持 `codex`
+- `gemini` 与 `cursor` 当前仍为只读摘要
+
+## 9. 插件接口
+
+### `GET /api/projects/:projectId/plugins/catalog`
+
+说明：
+获取当前项目可安装的插件目录，包含内建插件和项目内 `.relaydesk/plugins/*.json` 本地插件。
+
+### `GET /api/projects/:projectId/plugins`
+
+说明：
+获取项目内已安装插件列表。
+
+### `POST /api/projects/:projectId/plugins/install`
+
+说明：
+安装或重新启用一个插件。
+
+### `POST /api/projects/:projectId/plugins/:pluginId/state`
+
+说明：
+更新插件启停状态。
+
+### `GET /api/projects/:projectId/plugins/:pluginId/context`
+
+说明：
+获取插件宿主上下文，包括项目、会话、运行和审批摘要。
+
+### `POST /api/projects/:projectId/plugins/:pluginId/actions/:actionId/execute`
+
+说明：
+执行插件声明的受控动作。
+
+当前实现：
+
+- 当前只允许白名单命令
+- 工作目录固定为项目根目录
+- 每次执行都会写入项目级审计事件
+
+## 10. 任务接口
+
+### `GET /api/projects/:projectId/tasks`
+
+说明：
+返回项目任务看板摘要，包括：
+
+- 项目级文档引用
+- TaskMaster 任务文件扫描结果
+- 任务状态统计
+- 当前只读任务列表
+
+当前实现：
+
+- 优先读取本地 TaskMaster 文件
+- 若未发现任务文件，仍会返回项目文档基线
+
+## 11. WebSocket 协议
 
 ### 客户端发送
 
@@ -403,8 +513,8 @@ WebSocket 消息格式错误或服务端订阅错误。
 
 当前限制：
 
-- 仅支持读取状态，不支持暂存、提交、切换分支
 - 项目根目录必须是合法 Git 仓库
+- 当前仅支持本地暂存、提交和分支切换/创建，尚未支持 pull、push、回滚和远程分支管理
 
 ### `GET /api/projects/:projectId/git/diff?path=<relativePath>`
 
@@ -424,12 +534,61 @@ WebSocket 消息格式错误或服务端订阅错误。
 }
 ```
 
+### `GET /api/projects/:projectId/git/branches`
+
+说明：
+获取当前仓库的本地分支列表以及当前所在分支。
+
+### `POST /api/projects/:projectId/git/stage`
+
+说明：
+暂存一组文件改动。
+
+请求体：
+
+```json
+{
+  "paths": ["apps/web/src/App.tsx", "README.md"]
+}
+```
+
+### `POST /api/projects/:projectId/git/unstage`
+
+说明：
+取消暂存一组文件改动。
+
+### `POST /api/projects/:projectId/git/commit`
+
+说明：
+基于当前暂存区创建一次本地提交。
+
+请求体：
+
+```json
+{
+  "message": "feat: add git workspace write actions"
+}
+```
+
+### `POST /api/projects/:projectId/git/checkout`
+
+说明：
+切换已有分支，或创建并切换到新分支。
+
+请求体：
+
+```json
+{
+  "name": "feature/git-write",
+  "create": true
+}
+```
+
 ## 12. 计划中的接口
 
 以下接口尚未实现，但建议后续保持这一层级：
 
-- `GET /api/runs/:runId/checkpoints`
-- `POST /api/runs/:runId/restore`
+- 暂无新增计划接口
 
 ## 13. 设计约束
 

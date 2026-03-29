@@ -4,15 +4,15 @@ import { getAuthUser, hashPassword, verifyPassword } from "../auth.js";
 import { serializeUser } from "../db.js";
 
 const credentialSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6)
+  email: z.string().trim().email("请输入有效邮箱地址"),
+  password: z.string().min(6, "密码至少 6 位")
 });
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/auth/register", async (request, reply) => {
     const parsed = credentialSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ message: "Invalid payload" });
+      return reply.code(400).send({ message: parsed.error.issues[0]?.message ?? "Invalid payload" });
     }
 
     const existing = await app.db.collections.users.findOne({ email: parsed.data.email });
@@ -43,7 +43,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/auth/login", async (request, reply) => {
     const parsed = credentialSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ message: "Invalid payload" });
+      return reply.code(400).send({ message: parsed.error.issues[0]?.message ?? "Invalid payload" });
     }
 
     const user = await app.db.collections.users.findOne({ email: parsed.data.email });
