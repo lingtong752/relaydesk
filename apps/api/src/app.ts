@@ -7,7 +7,7 @@ import type { WebSocketClientMessage } from "@shared";
 import { authenticate } from "./auth.js";
 import type { Database } from "./db.js";
 import { connectDatabase } from "./db.js";
-import { env } from "./env.js";
+import { env, getAuthEnv, getDatabaseEnv } from "./env.js";
 import { registerApprovalRoutes } from "./routes/approvals.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerFileRoutes } from "./routes/files.js";
@@ -74,7 +74,12 @@ function createAllowedOriginSet(configuredOrigins: string): Set<string> {
 
 export async function createApp(options: CreateAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
-  const db = options.db ?? (await connectDatabase(env.MONGODB_URI, env.MONGODB_DB));
+  const db = options.db
+    ? options.db
+    : await (async () => {
+        const dbConfig = getDatabaseEnv();
+        return connectDatabase(dbConfig.MONGODB_URI, dbConfig.MONGODB_DB);
+      })();
   const shouldCloseDb = !options.db;
   const hub = new SessionHub();
   const streamRegistry = new StreamRegistry();
@@ -108,7 +113,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   });
 
   await app.register(jwt, {
-    secret: options.jwtSecret ?? env.JWT_SECRET
+    secret: options.jwtSecret ?? getAuthEnv().JWT_SECRET
   });
 
   await app.register(websocket);
