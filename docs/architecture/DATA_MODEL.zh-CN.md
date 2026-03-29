@@ -1,6 +1,6 @@
 # RelayDesk 数据模型
 
-最后更新：2026-03-28
+最后更新：2026-03-29
 
 ## 1. 说明
 
@@ -111,7 +111,7 @@
 - `updatedAt`
 
 说明：
-当前集合已预留，但业务流程尚未完整接入。
+当前集合已接入运行审批链路。
 
 ## 4. 当前状态与缺口
 
@@ -122,18 +122,18 @@
 - `sessions`
 - `messages`
 - `runs`
-- `approvals` 集合定义和连接
+- `approvals`
+- `audit_events`
+- `run_checkpoints`
+- `plugin_installations`
 
 尚未落地：
 
-- `audit_events`
 - `terminal_sessions`
-- `plugin_installations`
 - `tasks`
 - `notifications`
-- `run_checkpoints`
 
-## 5. 建议新增集合
+## 5. 核心集合说明
 
 ### `audit_events`
 
@@ -152,6 +152,10 @@
 - `payload`
 - `createdAt`
 
+当前实现补充：
+
+- `sessionId` 和 `runId` 当前允许为空，用于承接插件动作等项目级审计事件
+
 ### `terminal_sessions`
 
 用途：
@@ -164,11 +168,21 @@
 
 - 记录插件安装源、版本、启停状态和宿主上下文
 
+当前实现补充：
+
+- 当前已作为 MongoDB 集合落地
+- 插件动作声明也会随安装记录一起存储，供插件运行时消费
+
 ### `tasks`
 
 用途：
 
 - 记录项目任务、状态、优先级、来源 PRD
+
+当前实现补充：
+
+- 当前任务工作台优先从文件系统聚合 TaskMaster 任务与项目文档引用
+- 任务实体尚未作为 MongoDB 持久化集合落地
 
 ### `run_checkpoints`
 
@@ -183,7 +197,9 @@
 - 一个 `session` 可以拥有多条 `messages`
 - 一个 `project` 可以拥有多条 `runs`
 - 一条 `run` 可以关联多个 `approvals`
-- 后续一条 `run` 还可以关联多个 `audit_events` 和 `run_checkpoints`
+- 当前一条 `run` 已可关联多个 `audit_events` 和 `run_checkpoints`
+- 一个 `project` 当前可以关联多个 `plugin_installations`
+- 当前任务看板由 `project` + 文档文件 + TaskMaster 文件聚合生成，而不是直接落库
 
 ## 7. 演进建议
 

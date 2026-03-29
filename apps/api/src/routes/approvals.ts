@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { buildRejectedRunMessage } from "../services/approvalFlow.js";
 import { streamSurrogateRun } from "../services/mockStreams.js";
+import { recordRunHistory, toRunIdentity } from "../services/runHistory.js";
 
 const resolveApprovalSchema = z.object({
   note: z.string().trim().max(300).optional()
@@ -118,6 +119,17 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
         { _id: context.run._id },
         { $set: { status: "running", updatedAt: now } }
       );
+      await recordRunHistory({
+        collections: app.db.collections,
+        run: toRunIdentity(context.run),
+        eventType: "approval.approved",
+        actorType: "user",
+        summary: "审批已通过，替身运行开始继续执行。",
+        payload: parsedBody.data.note ? { note: parsedBody.data.note } : undefined,
+        checkpointStatus: "running",
+        checkpointSource: "approval.approved",
+        createdAt: now
+      });
 
       const [updatedApproval, updatedRun] = await Promise.all([
         app.db.collections.approvals.findOne({ _id: context.approval._id }),
@@ -138,6 +150,7 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
         });
 
         void streamSurrogateRun({
+          cliSessionRunner: app.cliSessionRunner,
           collections: app.db.collections,
           hub: app.hub,
           registry: app.streamRegistry,
@@ -203,6 +216,18 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
         updatedAt: now
       };
       await app.db.collections.messages.insertOne(rejectionMessage);
+      await recordRunHistory({
+        collections: app.db.collections,
+        run: toRunIdentity(context.run),
+        eventType: "approval.rejected",
+        actorType: "user",
+        summary: "审批已拒绝，替身运行已停止。",
+        payload: parsedBody.data.note ? { note: parsedBody.data.note } : undefined,
+        checkpointStatus: "stopped",
+        checkpointSource: "approval.rejected",
+        messageId: rejectionMessage._id,
+        createdAt: now
+      });
 
       const [updatedApproval, updatedRun] = await Promise.all([
         app.db.collections.approvals.findOne({ _id: context.approval._id }),

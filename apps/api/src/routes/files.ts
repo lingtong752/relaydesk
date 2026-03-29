@@ -3,15 +3,22 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { getAuthUser } from "../auth.js";
 import { parseObjectId } from "../db.js";
+import { resolveProjectRootPath } from "../services/projectRoot.js";
 import {
   WorkspaceFileError,
   listWorkspaceFiles,
   readWorkspaceFile,
+  searchWorkspaceFiles,
   saveWorkspaceFile
 } from "../services/workspaceFiles.js";
 
 const filePathQuerySchema = z.object({
   path: z.string().optional()
+});
+
+const fileSearchQuerySchema = z.object({
+  query: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional()
 });
 
 const saveFileSchema = z.object({
@@ -73,8 +80,9 @@ export async function registerFileRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ message: "Invalid query" });
         }
 
-        const result = await listWorkspaceFiles(project.rootPath, parsedQuery.data.path);
-        return { ...result, rootPath: project.rootPath };
+        const resolvedRootPath = await resolveProjectRootPath(project.rootPath);
+        const result = await listWorkspaceFiles(resolvedRootPath, parsedQuery.data.path);
+        return { ...result, rootPath: resolvedRootPath };
       } catch (error) {
         const handled = handleWorkspaceFileError(error);
         return reply.code(handled.statusCode).send({ message: handled.message });
@@ -98,7 +106,42 @@ export async function registerFileRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(400).send({ message: "Invalid query" });
         }
 
-        return { file: await readWorkspaceFile(project.rootPath, parsedQuery.data.path) };
+        return {
+          file: await readWorkspaceFile(
+            await resolveProjectRootPath(project.rootPath),
+            parsedQuery.data.path
+          )
+        };
+      } catch (error) {
+        const handled = handleWorkspaceFileError(error);
+        return reply.code(handled.statusCode).send({ message: handled.message });
+      }
+    }
+  );
+
+  app.get(
+    "/api/projects/:projectId/files/search",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      try {
+        const authUser = getAuthUser(request);
+        const project = await getOwnedProject(
+          app,
+          authUser.userId,
+          (request.params as { projectId: string }).projectId
+        );
+        const parsedQuery = fileSearchQuerySchema.safeParse(request.query);
+        if (!parsedQuery.success) {
+          return reply.code(400).send({ message: "Invalid query" });
+        }
+
+        return {
+          entries: await searchWorkspaceFiles({
+            rootPath: await resolveProjectRootPath(project.rootPath),
+            query: parsedQuery.data.query ?? "",
+            limit: parsedQuery.data.limit
+          })
+        };
       } catch (error) {
         const handled = handleWorkspaceFileError(error);
         return reply.code(handled.statusCode).send({ message: handled.message });
@@ -124,7 +167,7 @@ export async function registerFileRoutes(app: FastifyInstance): Promise<void> {
 
         return {
           file: await saveWorkspaceFile({
-            rootPath: project.rootPath,
+            rootPath: await resolveProjectRootPath(project.rootPath),
             relativePath: parsedBody.data.path,
             content: parsedBody.data.content
           })

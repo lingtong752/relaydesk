@@ -48,6 +48,7 @@ export function connectTerminal(input: {
 }): TerminalClient {
   const wsUrl = `${getApiBaseUrl().replace(/^http/, "ws")}/terminal?token=${encodeURIComponent(input.token)}&sessionId=${encodeURIComponent(input.sessionId)}`;
   const socket = new WebSocket(wsUrl);
+  const pendingMessages: string[] = [];
 
   socket.addEventListener("message", (event) => {
     try {
@@ -60,16 +61,29 @@ export function connectTerminal(input: {
     }
   });
 
+  socket.addEventListener("open", () => {
+    while (pendingMessages.length > 0) {
+      socket.send(pendingMessages.shift()!);
+    }
+  });
+
+  function sendOrQueue(message: string): void {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(message);
+      return;
+    }
+
+    if (socket.readyState === WebSocket.CONNECTING) {
+      pendingMessages.push(message);
+    }
+  }
+
   return {
     sendInput(data: string) {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "input", payload: { data } }));
-      }
+      sendOrQueue(JSON.stringify({ type: "input", payload: { data } }));
     },
     resize(cols: number, rows: number) {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "resize", payload: { cols, rows } }));
-      }
+      sendOrQueue(JSON.stringify({ type: "resize", payload: { cols, rows } }));
     },
     close() {
       socket.close();

@@ -7,7 +7,11 @@ import {
   serializeMessage,
   serializeSession
 } from "../db.js";
-import { streamProviderMessage } from "../services/mockStreams.js";
+import { listImportedCliConversationMessages } from "../services/importedCliSessions.js";
+import {
+  streamImportedCliSessionMessage,
+  streamProviderMessage
+} from "../services/mockStreams.js";
 
 const createSessionSchema = z.object({
   title: z.string().min(1),
@@ -70,6 +74,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         projectId: parsedProjectId,
         provider: parsedBody.data.provider,
         title: parsedBody.data.title,
+        origin: "relaydesk" as const,
         status: "idle" as const,
         createdAt: now,
         updatedAt: now
@@ -108,6 +113,20 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         return reply.code(404).send({ message: "Project not found" });
       }
 
+      if (session.origin === "imported_cli") {
+        const overlayMessages = await app.db.collections.messages
+          .find({ sessionId: parsedSessionId })
+          .sort({ createdAt: 1 })
+          .toArray();
+
+        return {
+          messages: await listImportedCliConversationMessages({
+            session,
+            overlayMessages: overlayMessages.map(serializeMessage)
+          })
+        };
+      }
+
       const messages = await app.db.collections.messages
         .find({ sessionId: parsedSessionId })
         .sort({ createdAt: 1 })
@@ -141,6 +160,14 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         return reply.code(404).send({ message: "Project not found" });
       }
 
+      if (session.origin === "imported_cli") {
+        if (!app.cliSessionRunner.supportsImportedSession(session.provider)) {
+          return reply.code(409).send({
+            message: `Imported ${session.provider} sessions cannot continue via local CLI yet`
+          });
+        }
+      }
+
       const now = new Date();
       const userMessage = {
         sessionId: session._id,
@@ -169,6 +196,20 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         type: "message.created",
         payload: { message: serializeMessage(created) }
       });
+
+      if (session.origin === "imported_cli") {
+        void streamImportedCliSessionMessage({
+          cliSessionRunner: app.cliSessionRunner,
+          collections: app.db.collections,
+          hub: app.hub,
+          registry: app.streamRegistry,
+          session,
+          projectRootPath: project.rootPath,
+          prompt: parsedBody.data.content
+        });
+
+        return { message: serializeMessage(created) };
+      }
 
       void streamProviderMessage({
         collections: app.db.collections,
