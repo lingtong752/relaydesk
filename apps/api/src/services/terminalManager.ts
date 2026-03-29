@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import { access, chmod, mkdir, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
-import pty, { type IPty } from "node-pty";
+import type { IPty } from "node-pty";
 import type { TerminalSessionRecord } from "@shared";
 
 const SESSION_TTL_MS = 5 * 60 * 1000;
@@ -14,7 +14,26 @@ interface NodePtyNativeModule {
   dir: string;
 }
 
-const NODE_PTY_SPAWN_HELPER_PATH = resolveNodePtySpawnHelperPath();
+interface NodePtyLike {
+  spawn(
+    file: string,
+    args: string[],
+    options: {
+      name: string;
+      cwd: string;
+      cols: number;
+      rows: number;
+      env: NodeJS.ProcessEnv;
+    }
+  ): IPty;
+}
+
+interface NodePtyRuntime {
+  pty: NodePtyLike;
+  spawnHelperPath: string | null;
+}
+
+let nodePtyRuntimePromise: Promise<NodePtyRuntime> | null = null;
 
 interface TerminalSession {
   id: string;
@@ -58,6 +77,24 @@ function resolveNodePtySpawnHelperPath(): string | null {
   }
 }
 
+async function loadNodePtyRuntime(): Promise<NodePtyRuntime> {
+  if (!nodePtyRuntimePromise) {
+    nodePtyRuntimePromise = (async () => {
+      const module = await import("node-pty");
+      return {
+        pty: module.default as NodePtyLike,
+        spawnHelperPath: resolveNodePtySpawnHelperPath()
+      };
+    })();
+  }
+
+  return nodePtyRuntimePromise;
+}
+
+export function resetNodePtyRuntimeForTests(): void {
+  nodePtyRuntimePromise = null;
+}
+
 export async function ensureExecutablePermissions(filePath: string | null): Promise<void> {
   if (!filePath) {
     return;
@@ -88,13 +125,24 @@ export class TerminalManager {
     cwd: string;
   }): Promise<TerminalSessionRecord> {
     await mkdir(input.cwd, { recursive: true });
-    await ensureExecutablePermissions(NODE_PTY_SPAWN_HELPER_PATH);
+    let nodePtyRuntime: NodePtyRuntime;
+    try {
+      nodePtyRuntime = await loadNodePtyRuntime();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown node-pty error";
+      throw new TerminalManagerError(
+        500,
+        `Terminal support is unavailable on this host: ${message}`
+      );
+    }
+
+    await ensureExecutablePermissions(nodePtyRuntime.spawnHelperPath);
 
     const shell = process.env.SHELL || "/bin/zsh";
     let terminal: IPty;
 
     try {
-      terminal = pty.spawn(shell, [], {
+      terminal = nodePtyRuntime.pty.spawn(shell, [], {
         name: "xterm-256color",
         cwd: input.cwd,
         cols: 120,
