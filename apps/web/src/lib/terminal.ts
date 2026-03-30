@@ -1,16 +1,11 @@
+import type { TerminalSessionRecord } from "@shared";
 import { getApiBaseUrl } from "./api";
 
 export interface TerminalEventReady {
   type: "terminal.ready";
   payload: {
     backlog: string;
-    session: {
-      id: string;
-      projectId: string;
-      cwd: string;
-      shell: string;
-      createdAt: string;
-    };
+    session: TerminalSessionRecord;
   };
 }
 

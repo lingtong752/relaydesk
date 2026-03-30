@@ -5,6 +5,7 @@ import type {
   Database,
   DatabaseCollections,
   MessageDoc,
+  PluginExecutionHistoryDoc,
   PluginInstallationDoc,
   ProjectDoc,
   RunCheckpointDoc,
@@ -109,6 +110,20 @@ class InMemoryCollection<T extends { _id?: ObjectId }> {
       modifiedCount: matches.length
     };
   }
+
+  async deleteOne(query: Query<T>): Promise<{ deletedCount: number }> {
+    const index = this.items.findIndex((item) => matchesQuery(item, query));
+    if (index === -1) {
+      return { deletedCount: 0 };
+    }
+
+    this.items.splice(index, 1);
+    return { deletedCount: 1 };
+  }
+
+  async countDocuments(query: Query<T>): Promise<number> {
+    return this.items.filter((item) => matchesQuery(item, query)).length;
+  }
 }
 
 function applyUpdate<T extends object>(
@@ -163,7 +178,8 @@ export function createInMemoryDatabase(): Database {
     approvals: new InMemoryCollection<ApprovalDoc>() as never,
     auditEvents: new InMemoryCollection<AuditEventDoc>() as never,
     runCheckpoints: new InMemoryCollection<RunCheckpointDoc>() as never,
-    pluginInstallations: new InMemoryCollection<PluginInstallationDoc>() as never
+    pluginInstallations: new InMemoryCollection<PluginInstallationDoc>() as never,
+    pluginExecutionHistory: new InMemoryCollection<PluginExecutionHistoryDoc>() as never
   };
 
   return {

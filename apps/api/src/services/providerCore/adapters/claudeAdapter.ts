@@ -1,7 +1,7 @@
 import type { MessageDoc } from "../../../db.js";
 import { env } from "../../../env.js";
 import { ProviderRuntimeError } from "../errors.js";
-import { normalizeContent } from "../shared.js";
+import { buildProviderCliBridgeSupport, buildShellTerminalSupport, normalizeContent } from "../shared.js";
 import type { ProviderAdapter, ProviderMode } from "../types.js";
 
 interface ClaudeRequestMessage {
@@ -62,6 +62,13 @@ export function buildClaudeMessages(history: MessageDoc[]): ClaudeRequestMessage
 
 export const claudeProviderAdapter: ProviderAdapter = {
   id: "claude",
+  getTerminalSupport(input) {
+    if (input.runtimeMode === "cli_session_mode") {
+      return buildProviderCliBridgeSupport();
+    }
+
+    return buildShellTerminalSupport("当前 Claude 会话不是 CLI 历史会话，先回退到项目 shell。");
+  },
   async generateReply(input) {
     if (!env.ANTHROPIC_API_KEY) {
       throw new ProviderRuntimeError("Claude provider is not configured. Please set ANTHROPIC_API_KEY.");

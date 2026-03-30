@@ -13,18 +13,33 @@ vi.mock("../features/workspace/useProjectWorkspace", () => ({
 }));
 
 vi.mock("../features/tools/files/components/FileWorkspace", () => ({
-  FileWorkspace: () => <div>files-workspace-panel</div>
+  FileWorkspace: (props: { boundSession?: { id: string } | null }) => (
+    <div>files-workspace-panel:{props.boundSession?.id ?? "none"}</div>
+  )
 }));
 
 vi.mock("../features/tools/terminal/components/TerminalWorkspace", () => ({
-  TerminalWorkspace: () => <div>terminal-workspace-panel</div>
+  TerminalWorkspace: (props: {
+    focusSourceSessionId?: string;
+    workspaceSessions?: Array<{ id: string }>;
+  }) => (
+    <div>
+      terminal-workspace-panel
+      {props.focusSourceSessionId ? `:${props.focusSourceSessionId}` : ""}
+      :{props.workspaceSessions?.length ?? 0}
+    </div>
+  )
 }));
 
 vi.mock("../features/tools/git/components/GitWorkspace", () => ({
-  GitWorkspace: () => <div>git-workspace-panel</div>
+  GitWorkspace: (props: { boundSession?: { id: string } | null }) => (
+    <div>git-workspace-panel:{props.boundSession?.id ?? "none"}</div>
+  )
 }));
 
-function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
+function createWorkspaceContext(
+  overrides: Partial<ReturnType<typeof useProjectWorkspace>> = {}
+): ReturnType<typeof useProjectWorkspace> {
   return {
     projectId: "project-demo",
     token: "token-demo",
@@ -53,7 +68,9 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
     resumeRun: vi.fn(),
     approveApproval: vi.fn(),
     rejectApproval: vi.fn(),
-    handleRunRestored: vi.fn()
+    handleRunCreated: vi.fn(),
+    handleRunRestored: vi.fn(),
+    ...overrides
   } as ReturnType<typeof useProjectWorkspace>;
 }
 
@@ -82,7 +99,7 @@ describe("WorkspaceTools routes", () => {
     const markup = renderToolsRoute("/workspace/project-demo/tools/files");
 
     expect(markup).toContain("文件、终端与 Git");
-    expect(markup).toContain("files-workspace-panel");
+    expect(markup).toContain("files-workspace-panel:none");
   });
 
   it("renders the terminal tool route", () => {
@@ -90,7 +107,61 @@ describe("WorkspaceTools routes", () => {
 
     const markup = renderToolsRoute("/workspace/project-demo/tools/terminal");
 
-    expect(markup).toContain("terminal-workspace-panel");
+    expect(markup).toContain("terminal-workspace-panel:0");
+  });
+
+  it("passes the current session query into the terminal workspace", () => {
+    vi.mocked(useProjectWorkspace).mockReturnValue(createWorkspaceContext());
+
+    const markup = renderToolsRoute("/workspace/project-demo/tools/terminal?sessionId=session-123");
+
+    expect(markup).toContain("terminal-workspace-panel:session-123:0");
+  });
+
+  it("passes the current session query into the file workspace", () => {
+    vi.mocked(useProjectWorkspace).mockReturnValue(
+      createWorkspaceContext({
+        sessions: [
+          {
+            id: "session-123",
+            projectId: "project-demo",
+            title: "会话 123",
+            provider: "codex",
+            origin: "relaydesk",
+            status: "idle",
+            createdAt: "2026-03-29T08:00:00.000Z",
+            updatedAt: "2026-03-29T08:00:00.000Z"
+          }
+        ]
+      })
+    );
+
+    const markup = renderToolsRoute("/workspace/project-demo/tools/files?sessionId=session-123");
+
+    expect(markup).toContain("files-workspace-panel:session-123");
+  });
+
+  it("passes the current session query into the git workspace", () => {
+    vi.mocked(useProjectWorkspace).mockReturnValue(
+      createWorkspaceContext({
+        sessions: [
+          {
+            id: "session-123",
+            projectId: "project-demo",
+            title: "会话 123",
+            provider: "codex",
+            origin: "relaydesk",
+            status: "idle",
+            createdAt: "2026-03-29T08:00:00.000Z",
+            updatedAt: "2026-03-29T08:00:00.000Z"
+          }
+        ]
+      })
+    );
+
+    const markup = renderToolsRoute("/workspace/project-demo/tools/git?sessionId=session-123");
+
+    expect(markup).toContain("git-workspace-panel:session-123");
   });
 
   it("renders the git tool route", () => {
@@ -98,6 +169,6 @@ describe("WorkspaceTools routes", () => {
 
     const markup = renderToolsRoute("/workspace/project-demo/tools/git");
 
-    expect(markup).toContain("git-workspace-panel");
+    expect(markup).toContain("git-workspace-panel:none");
   });
 });

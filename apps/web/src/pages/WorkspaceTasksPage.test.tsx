@@ -36,6 +36,12 @@ function createTaskBoard(): ProjectTaskBoardRecord {
         priority: "high",
         summary: "把任务系统做成正式工作台。",
         nestingLevel: 0,
+        assignee: "Alice",
+        notes: "先把路由和页面打通。",
+        blockedReason: null,
+        boundSessionId: "session-1",
+        boundRunId: null,
+        timeline: [],
         sourcePath: "/tmp/relaydesk/.taskmaster/tasks/tasks.json",
         updatedAt: "2026-03-29T05:10:00.000Z"
       },
@@ -46,6 +52,20 @@ function createTaskBoard(): ProjectTaskBoardRecord {
         status: "done",
         parentId: "TASK-1",
         nestingLevel: 1,
+        assignee: null,
+        notes: null,
+        blockedReason: null,
+        boundSessionId: null,
+        boundRunId: "run-1",
+        timeline: [
+          {
+            id: "timeline-1",
+            type: "run_started",
+            summary: "已从任务面板发起替身运行。",
+            detail: "推进任务：补 API 路由",
+            createdAt: "2026-03-29T05:20:00.000Z"
+          }
+        ],
         sourcePath: "/tmp/relaydesk/.taskmaster/tasks/tasks.json",
         updatedAt: "2026-03-29T05:12:00.000Z"
       }
@@ -65,19 +85,29 @@ function createTaskBoard(): ProjectTaskBoardRecord {
         blocked: 0,
         unknown: 0
       },
-      notes: ["当前为 TaskMaster 只读摘要，后续会补双向同步和 RelayDesk 内建任务。"]
+      notes: ["TaskMaster 已接入可执行工作台，任务修改会显式写回本地文件。"]
     }
   };
 }
 
 describe("ProjectTasksOverview", () => {
   it("renders project documents, TaskMaster summary, and task list", () => {
+    const board = createTaskBoard();
     const markup = renderToStaticMarkup(
       <StaticRouter location="/workspace/project-demo/tasks">
         <ProjectTasksOverview
-          board={createTaskBoard()}
+          board={board}
           error={null}
           loading={false}
+          pendingConflict={{
+            kind: "save",
+            task: {
+              ...board.tasks[0]!,
+              status: "blocked",
+              notes: "需要先补充 API 错误态。"
+            },
+            message: "TaskMaster 文件已在外部更新，请先显式同步后再保存。"
+          }}
           projectId="project-demo"
           projectRootPath="/tmp/relaydesk"
         />
@@ -89,6 +119,11 @@ describe("ProjectTasksOverview", () => {
     expect(markup).toContain("接入任务页");
     expect(markup).toContain("补 API 路由");
     expect(markup).toContain("PRD");
-    expect(markup).toContain("只读任务视图");
+    expect(markup).toContain("任务执行视图");
+    expect(markup).toContain("检测到 TaskMaster 同步冲突");
+    expect(markup).toContain("保留当前编辑并覆盖");
+    expect(markup).toContain("字段分叉");
+    expect(markup).toContain("当前编辑：阻塞");
+    expect(markup).toContain("最新文件：进行中");
   });
 });

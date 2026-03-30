@@ -326,6 +326,22 @@ async function summarizeGeminiConfig(
   const projectJson = parseJsonDocument(projectSettings.text);
   const antigravityJson = parseJsonDocument(antigravityMcpConfig.text);
   const model = getString(projectJson?.model) ?? getString(globalJson?.model) ?? null;
+  const reasoningEffort =
+    getString(projectJson?.reasoningEffort) ?? getString(globalJson?.reasoningEffort) ?? null;
+  const approvalPolicy =
+    getString(projectJson?.approvalPolicy) ?? getString(globalJson?.approvalPolicy) ?? null;
+  const sandboxMode = getString(projectJson?.sandboxMode) ?? getString(globalJson?.sandboxMode) ?? null;
+  const allowedTools = firstStringArray(
+    asStringArray(projectJson?.allowedTools),
+    asStringArray(globalJson?.allowedTools)
+  );
+  const disallowedTools = firstStringArray(
+    asStringArray(projectJson?.disallowedTools),
+    asStringArray(globalJson?.disallowedTools)
+  );
+  const toolPermissionMode = [approvalPolicy ? `approval=${approvalPolicy}` : null, sandboxMode ? `sandbox=${sandboxMode}` : null]
+    .filter(Boolean)
+    .join(" · ");
   const mcpServers = [
     ...parseMcpServersObject({
       provider: "gemini",
@@ -358,6 +374,12 @@ async function summarizeGeminiConfig(
     provider: "gemini",
     sources: [globalSettings.source, projectSettings.source, antigravityMcpConfig.source],
     model,
+    reasoningEffort,
+    approvalPolicy,
+    sandboxMode,
+    toolPermissionMode: toolPermissionMode || null,
+    allowedTools,
+    disallowedTools,
     mcpServers,
     notes
   });

@@ -89,6 +89,7 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
     resumeRun: vi.fn(),
     approveApproval: vi.fn(),
     rejectApproval: vi.fn(),
+    handleRunCreated: vi.fn(),
     handleRunRestored: vi.fn()
   } as ReturnType<typeof useProjectWorkspace>;
 }

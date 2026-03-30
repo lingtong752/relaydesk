@@ -34,6 +34,7 @@ export interface ProjectWorkspaceContextValue {
   resumeRun(): Promise<void>;
   approveApproval(approvalId: string): Promise<void>;
   rejectApproval(approvalId: string): Promise<void>;
+  handleRunCreated(run: RunRecord | null, approval: ApprovalRecord | null): void;
   handleRunRestored(run: RunRecord | null, approval: ApprovalRecord | null): void;
 }
 
@@ -207,6 +208,11 @@ export function ProjectWorkspaceProvider({
     setActiveApproval(approval);
   }
 
+  function handleRunCreated(run: RunRecord | null, approval: ApprovalRecord | null): void {
+    updateActiveRun(run);
+    setActiveApproval(approval);
+  }
+
   return (
     <ProjectWorkspaceContext.Provider
       value={{
@@ -237,6 +243,7 @@ export function ProjectWorkspaceProvider({
         resumeRun,
         approveApproval,
         rejectApproval,
+        handleRunCreated,
         handleRunRestored
       }}
     >

@@ -1,6 +1,6 @@
 # RelayDesk 开发待办
 
-最后更新：2026-03-29
+最后更新：2026-03-30
 
 ## 1. 说明
 
@@ -38,13 +38,14 @@
 - `done` Gemini 真实 Provider 首条链路
 - `done` 本机项目发现与 CLI 历史会话导入
 - `done` Claude / Codex / Gemini CLI 会话恢复与继续执行
-- `done` Claude / Codex Settings、MCP 与工具权限写回
+- `done` Claude / Codex / Gemini Settings、MCP 与工具权限写回
 - `done` CodeMirror 多标签编辑、快速打开与草稿状态保护
 - `done` 多终端标签与重连回补
 - `done` Git fetch / pull / push 远程同步
 - `done` 插件安装与启停骨架
 - `done` 插件宿主上下文、本地 manifest 与受控动作执行
-- `done` 任务工作台与 TaskMaster 只读摘要
+- `done` 插件安装源、本地 / git 插件安装、后端 RPC 与执行历史
+- `done` 任务工作台可执行面板、TaskMaster 显式写回与从任务发起替身运行
 - `done` 开源治理与基础质量门禁
 
 ## 3. P0 待办
@@ -69,20 +70,39 @@
 - `done` 支持恢复并继续 Claude CLI 会话
 - `done` 支持恢复并继续 Codex CLI 会话
 - `done` 支持恢复并继续 Gemini CLI 会话
-- `blocked` 接入真实 Cursor provider 与会话恢复
 - `done` 统一不同 provider 的会话摘要、状态和停止控制
+- `todo` 将导入会话升级为工作台一等对象，补充可恢复能力、最近恢复和最近失败元数据
+- `todo` 统一 session 生命周期与状态机，覆盖聊天、终端和运行页的共享状态
+- `todo` 为 session 增加统一的停止、恢复、重试入口
+- `todo` 增加 session 级审计事件和恢复失败可视化反馈
 
 验收标准：
 
 - 用户可从工作台直接恢复已有 CLI 会话
-- Claude、Codex、Cursor、Gemini 至少具备一致的恢复入口
+- Claude、Codex、Gemini 具备一致的恢复入口
 - 会话停止、刷新恢复与最近活动信息在 UI 中可见
+- 同一条会话在聊天页、终端页和运行页状态一致
 
-### 3.3 Settings、MCP 与工具权限同步
+### 3.3 原生 CLI Session 工作台
+
+- `todo` 在聊天页增加 session 头部卡片，展示 provider、来源、工作区、当前状态和可恢复性
+- `todo` 支持从当前 session 打开或附着终端 tab
+- `todo` 打通 session 与文件/Git/替身运行的共享上下文
+- `todo` 重构项目 bootstrap 数据，聚合 activeSession、sessionCapabilities 和最近审计事件
+- `todo` 增加 session 工作台的集成测试与 WebSocket 恢复测试
+
+验收标准：
+
+- 用户始终知道当前操作的是哪条 session
+- 工作台模块切换后，会话上下文不丢失
+- session 级恢复和重连路径具备自动化测试覆盖
+
+### 3.4 Settings、MCP 与工具权限同步
 
 - `done` 增加 Settings 页面骨架
 - `done` 读取本地 CLI 配置中的 Provider 偏好、MCP 与工具权限信息
-- `doing` 支持在 UI 中修改关键配置并写回本地配置目录
+- `done` 支持在 UI 中修改关键配置并写回本地配置目录
+- `done` 补齐 Gemini Settings、MCP 与工具权限写回
 - `todo` 为高风险配置变更增加校验、差异提示与回写反馈
 
 验收标准：
@@ -91,7 +111,21 @@
 - MCP / 工具权限变更可同步到本地 CLI
 - 配置错误不会静默覆盖本地内容
 
-### 3.4 替身 AI Agent 叠加到真实会话
+### 3.5 插件平台第一阶段
+
+- `done` 抽象插件安装源，支持 built-in / local path / git repo 安装
+- `done` 升级插件 manifest，覆盖后端服务、权限声明和版本信息
+- `doing` 支持插件注册自定义 tab、工具面板入口和宿主上下文消费
+- `done` 建立插件后端 RPC 主链路、执行历史和审计事件
+- `done` 把当前白名单命令执行迁移到统一权限模型下
+
+验收标准：
+
+- 用户能从 UI 安装、禁用和卸载插件
+- 插件可新增前端入口并调用受控后端 RPC
+- 插件行为有执行历史、权限边界和错误反馈
+
+### 3.6 替身 AI Agent 叠加到真实会话
 
 - `done` 支持在发现到的真实 CLI 会话上启动替身 AI Agent
 - `done` 让审批、接管、恢复与检查点围绕真实会话工作
@@ -150,7 +184,7 @@
 - `todo` 引入更完整的终端渲染体验
 - `done` 支持多终端标签页
 - `done` 支持终端会话保活、重连与更长输出回补
-- `todo` 预留 provider 对应 CLI 终端能力
+- `doing` 将终端会话升级为 session-aware 工作能力
 
 验收标准：
 
@@ -183,21 +217,14 @@
 
 ## 5. P2 待办
 
-### 5.1 插件系统
+### 5.1 任务与 PRD 管理
 
-- `done` 建立插件安装和启停骨架
-- `done` 设计插件宿主上下文
-- `done` 支持插件注册前端标签页和可选后端服务
-- `doing` 增加插件生命周期与权限边界
-
-### 5.2 任务与 PRD 管理
-
-- `doing` 增加任务模型与任务列表页
+- `done` 增加任务模型与任务列表页
 - `done` 补项目内文档引用能力
 - `doing` 增加 PRD、路线图、测试报告与任务之间的关联
-- `done` 增加 TaskMaster 只读集成与后续双向集成预留
+- `done` 增加 TaskMaster 可执行集成、显式同步与后续双向集成预留
 
-### 5.3 通知能力
+### 5.2 通知能力
 
 - `todo` 设计通知模型
 - `todo` 支持审批、运行状态和失败事件的通知
@@ -216,8 +243,8 @@
 
 ## 7. 本周建议执行顺序
 
-1. 任务工作台从只读摘要升级为可管理的执行面板
-2. 插件运行时权限分级、执行历史与后端 RPC
+1. 原生 CLI session 工作台
+2. 插件系统安装、扩展与后端 RPC
 3. Gemini Settings、MCP 与工具权限写回
-4. 运行轨迹、运行回放与 policy-engine
-5. 提交前文档、测试报告和版本说明收尾
+4. 任务工作台从只读摘要升级为可管理的执行面板
+5. 运行轨迹、运行回放与 policy-engine

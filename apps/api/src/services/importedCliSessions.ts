@@ -524,6 +524,10 @@ export async function syncImportedCliSessions(input: {
         nextValues.title = title;
       }
 
+      if (existingSession.runtimeMode !== "cli_session_mode") {
+        nextValues.runtimeMode = "cli_session_mode";
+      }
+
       if (shouldUpdateTimestamp) {
         nextValues.updatedAt = timestamp;
         nextValues.lastMessageAt = timestamp;
@@ -546,6 +550,7 @@ export async function syncImportedCliSessions(input: {
       origin: "imported_cli",
       externalSessionId,
       sourcePath,
+      runtimeMode: "cli_session_mode",
       status: "idle",
       createdAt: timestamp,
       updatedAt: timestamp,

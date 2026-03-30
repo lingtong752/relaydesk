@@ -277,7 +277,8 @@
 
 - 已支持 `claude`
 - 已支持 `codex`
-- `gemini` 与 `cursor` 当前仍为只读摘要
+- 已支持 `gemini`
+- `cursor` 当前仍为只读摘要
 
 ## 9. 插件接口
 
@@ -296,6 +297,12 @@
 说明：
 安装或重新启用一个插件。
 
+当前支持：
+
+- 通过 `pluginId` 安装 built-in / 项目内 catalog 插件
+- 通过 `sourceType=local` + `sourceRef` 安装本地路径插件
+- 通过 `sourceType=git` + `sourceRef` + 可选 `sourceVersion` 安装 git source 插件
+
 ### `POST /api/projects/:projectId/plugins/:pluginId/state`
 
 说明：
@@ -306,16 +313,38 @@
 说明：
 获取插件宿主上下文，包括项目、会话、运行和审批摘要。
 
+### `GET /api/projects/:projectId/plugins/:pluginId/frontend/module`
+
+说明：
+获取已安装插件的前端 bundle 源码、entry 路径、完整性摘要和宿主 API 版本。
+
+当前实现：
+
+- 仅对 `local_bundle / git_bundle` 插件开放
+- 返回 `integrity=sha256-...`，供前端 runtime 做加载前校验
+- 返回 `hostApiVersion`，供前端 runtime 做 API 兼容性检查
+
 ### `POST /api/projects/:projectId/plugins/:pluginId/actions/:actionId/execute`
 
 说明：
 执行插件声明的受控动作。
 
+### `GET /api/projects/:projectId/plugins/:pluginId/history`
+
+说明：
+返回指定插件最近的动作 / RPC 执行历史。
+
+### `POST /api/projects/:projectId/plugins/:pluginId/rpc/:rpcMethodId/execute`
+
+说明：
+执行插件声明的后端 RPC 方法。
+
 当前实现：
 
-- 当前只允许白名单命令
-- 工作目录固定为项目根目录
-- 每次执行都会写入项目级审计事件
+- 插件安装源已支持 built-in / local / git
+- 插件动作已切到统一权限模型，兼容旧受控动作
+- 插件可声明后端 RPC 方法并读取宿主上下文、任务看板、审计事件等能力
+- 每次动作 / RPC 调用都会写入项目级审计事件和插件执行历史
 
 ## 10. 任务接口
 
@@ -327,12 +356,28 @@
 - 项目级文档引用
 - TaskMaster 任务文件扫描结果
 - 任务状态统计
-- 当前只读任务列表
+- 当前任务列表、绑定的 session / run 与任务时间线
+
+### `PATCH /api/projects/:projectId/tasks/:taskId`
+
+说明：
+显式更新 TaskMaster 任务的状态、摘要、备注、阻塞原因和绑定信息，并回写到本地任务文件。
+
+### `POST /api/projects/:projectId/tasks/sync`
+
+说明：
+显式重新读取本地任务文件，返回最新任务看板。
+
+### `POST /api/projects/:projectId/tasks/:taskId/start-run`
+
+说明：
+从指定任务直接发起替身运行，并把当前 session / run 绑定回 TaskMaster 文件。
 
 当前实现：
 
 - 优先读取本地 TaskMaster 文件
 - 若未发现任务文件，仍会返回项目文档基线
+- 当前仍以 TaskMaster 文件为事实源，不额外引入 MongoDB 任务持久化
 
 ## 11. WebSocket 协议
 

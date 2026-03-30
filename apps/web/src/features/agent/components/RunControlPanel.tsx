@@ -1,4 +1,5 @@
 import type { SessionRecord } from "@shared";
+import { getSessionCapabilities } from "../../../lib/sessionRuntime";
 import { AgentStatusHeader } from "./AgentStatusHeader";
 
 interface RunControlPanelProps {
@@ -215,10 +216,7 @@ export function RunControlPanel({
   onResumeRun
 }: RunControlPanelProps): JSX.Element {
   const isImportedCliSession = selectedSession?.origin === "imported_cli";
-  const canRunImportedCliSession =
-    isImportedCliSession &&
-    !!selectedSession &&
-    ["claude", "codex", "gemini"].includes(selectedSession.provider);
+  const canRunImportedCliSession = getSessionCapabilities(selectedSession).canStartRuns;
   const actionGuidance = getActionGuidance({
     activeRunStatus,
     canRunImportedCliSession,

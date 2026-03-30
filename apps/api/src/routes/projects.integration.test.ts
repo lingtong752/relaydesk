@@ -105,6 +105,15 @@ describe("project routes integration", () => {
         id: string;
         provider: string;
         origin: string;
+        runtimeMode?: string;
+        capabilities?: {
+          canSendMessages: boolean;
+          canResume: boolean;
+          canStartRuns: boolean;
+          canAttachTerminal: boolean;
+        };
+        lastResumeStatus?: string;
+        lastResumedAt?: string;
         externalSessionId?: string;
         title: string;
       }>;
@@ -117,18 +126,27 @@ describe("project routes integration", () => {
         expect.objectContaining({
           provider: "claude",
           origin: "imported_cli",
+          runtimeMode: "cli_session_mode",
+          capabilities: {
+            canSendMessages: true,
+            canResume: true,
+            canStartRuns: true,
+            canAttachTerminal: true
+          },
           externalSessionId: "claude-session",
           title: "Fix login page"
         }),
         expect.objectContaining({
           provider: "codex",
           origin: "imported_cli",
+          runtimeMode: "cli_session_mode",
           externalSessionId: "codex-session",
           title: "Refactor API client"
         }),
         expect.objectContaining({
           provider: "gemini",
           origin: "imported_cli",
+          runtimeMode: "cli_session_mode",
           externalSessionId: "gemini-session",
           title: "Audit websocket reconnect"
         })
@@ -184,6 +202,31 @@ describe("project routes integration", () => {
         expect.objectContaining({ role: "provider", content: "CLI resumed: Continue the fix" })
       ])
     );
+
+    const refreshedBootstrapResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${projectBody.project.id}/bootstrap`,
+      headers: authHeader
+    });
+    const refreshedBootstrapBody = refreshedBootstrapResponse.json() as {
+      sessions: Array<{
+        id: string;
+        provider: string;
+        lastResumeStatus?: string;
+        lastResumedAt?: string;
+      }>;
+    };
+    const refreshedClaudeSession = refreshedBootstrapBody.sessions.find((session) => session.id === claudeSession!.id);
+
+    expect(refreshedBootstrapResponse.statusCode).toBe(200);
+    expect(refreshedClaudeSession).toEqual(
+      expect.objectContaining({
+        id: claudeSession!.id,
+        provider: "claude",
+        lastResumeStatus: "succeeded"
+      })
+    );
+    expect(refreshedClaudeSession?.lastResumedAt).toBeTruthy();
 
     const geminiSession = bootstrapBody.sessions.find((session) => session.provider === "gemini");
     expect(geminiSession).toBeDefined();

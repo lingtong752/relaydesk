@@ -84,7 +84,7 @@ export async function registerSettingsRoutes(
         return reply.code(400).send({ message: "Invalid payload" });
       }
 
-      if (provider !== "claude" && provider !== "codex") {
+      if (provider !== "claude" && provider !== "codex" && provider !== "gemini") {
         return reply.code(400).send({ message: `Saving settings for ${provider} is not supported yet` });
       }
 

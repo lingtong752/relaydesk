@@ -1,7 +1,7 @@
 import type { MessageDoc } from "../../../db.js";
 import { env } from "../../../env.js";
 import { ProviderRuntimeError } from "../errors.js";
-import { normalizeContent } from "../shared.js";
+import { buildProviderCliBridgeSupport, buildShellTerminalSupport, normalizeContent } from "../shared.js";
 import type { ProviderAdapter, ProviderMode } from "../types.js";
 
 interface OpenAIInputText {
@@ -81,6 +81,13 @@ export function buildOpenAIMessages(history: MessageDoc[]): OpenAIRequestMessage
 
 export const codexProviderAdapter: ProviderAdapter = {
   id: "codex",
+  getTerminalSupport(input) {
+    if (input.runtimeMode === "cli_session_mode") {
+      return buildProviderCliBridgeSupport();
+    }
+
+    return buildShellTerminalSupport("当前 Codex 会话不是 CLI 历史会话，先回退到项目 shell。");
+  },
   async generateReply(input) {
     if (!env.OPENAI_API_KEY) {
       throw new ProviderRuntimeError("Codex provider is not configured. Please set OPENAI_API_KEY.");

@@ -1,11 +1,14 @@
 import path from "node:path";
-import { access, readdir, readFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import type {
   ProjectDocumentReferenceRecord,
   ProjectTaskBoardRecord,
   ProjectTaskRecord,
   ProjectTaskStatus,
   ProjectTaskStatusCounts,
+  ProjectTaskTimelineEventRecord,
+  ProjectTaskTimelineEventType,
   TaskMasterSummaryRecord
 } from "@shared";
 
@@ -49,6 +52,47 @@ const DOCUMENT_REFERENCE_SPECS: Array<{
   }
 ];
 
+export interface TaskMutationInput {
+  status?: ProjectTaskStatus;
+  summary?: string | null;
+  assignee?: string | null;
+  notes?: string | null;
+  blockedReason?: string | null;
+  boundSessionId?: string | null;
+  boundRunId?: string | null;
+  timelineEvent?: {
+    type: ProjectTaskTimelineEventType;
+    summary: string;
+    detail?: string | null;
+    createdAt?: string;
+  };
+}
+
+interface TaskMasterSourceSnapshot {
+  sourcePath: string;
+  raw: string;
+  sourceUpdatedAt: string | null;
+  syncToken: string;
+}
+
+export class TaskMasterSyncConflictError extends Error {
+  readonly sourcePath: string;
+  readonly sourceUpdatedAt: string | null;
+  readonly currentSyncToken: string;
+
+  constructor(input: {
+    sourcePath: string;
+    sourceUpdatedAt: string | null;
+    currentSyncToken: string;
+  }) {
+    super("TaskMaster file changed since the last sync");
+    this.name = "TaskMasterSyncConflictError";
+    this.sourcePath = input.sourcePath;
+    this.sourceUpdatedAt = input.sourceUpdatedAt;
+    this.currentSyncToken = input.currentSyncToken;
+  }
+}
+
 export async function buildProjectTaskBoard(input: {
   projectId: string;
   projectRootPath: string;
@@ -67,6 +111,8 @@ export async function buildProjectTaskBoard(input: {
     taskMaster: {
       available: taskMaster.available,
       sourcePath: taskMaster.sourcePath,
+      sourceUpdatedAt: taskMaster.sourceUpdatedAt,
+      syncToken: taskMaster.syncToken,
       scannedPaths: taskMaster.scannedPaths,
       taskCount: taskMaster.taskCount,
       counts: taskMaster.counts,
@@ -157,6 +203,8 @@ async function collectTaskMasterSummary(projectRootPath: string): Promise<
     return {
       available: false,
       sourcePath: null,
+      sourceUpdatedAt: null,
+      syncToken: null,
       scannedPaths,
       taskCount: 0,
       counts: createEmptyTaskStatusCounts(),
@@ -166,19 +214,21 @@ async function collectTaskMasterSummary(projectRootPath: string): Promise<
   }
 
   try {
-    const raw = await readFile(sourcePath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
+    const snapshot = await readTaskMasterSourceSnapshot(sourcePath);
+    const parsed = JSON.parse(snapshot.raw) as unknown;
     const tasks = normalizeTaskMasterTasks(parsed, sourcePath);
 
     return {
       available: true,
       sourcePath,
+      sourceUpdatedAt: snapshot.sourceUpdatedAt,
+      syncToken: snapshot.syncToken,
       scannedPaths,
       taskCount: tasks.length,
       counts: countTaskStatuses(tasks),
       notes:
         tasks.length > 0
-          ? ["当前为 TaskMaster 只读摘要，后续会补双向同步和 RelayDesk 内建任务。"]
+          ? ["TaskMaster 已接入可执行工作台，任务修改会显式写回本地文件。"]
           : ["已发现 TaskMaster 文件，但没有解析到任务条目。"],
       tasks
     };
@@ -186,6 +236,8 @@ async function collectTaskMasterSummary(projectRootPath: string): Promise<
     return {
       available: true,
       sourcePath,
+      sourceUpdatedAt: null,
+      syncToken: null,
       scannedPaths,
       taskCount: 0,
       counts: createEmptyTaskStatusCounts(),
@@ -210,6 +262,16 @@ async function findFirstExistingPath(candidatePaths: string[]): Promise<string |
   }
 
   return null;
+}
+
+async function readTaskMasterSourceSnapshot(sourcePath: string): Promise<TaskMasterSourceSnapshot> {
+  const [raw, metadata] = await Promise.all([readFile(sourcePath, "utf8"), readFileMetadata(sourcePath)]);
+  return {
+    sourcePath,
+    raw,
+    sourceUpdatedAt: metadata.updatedAt,
+    syncToken: createHash("sha1").update(raw).digest("hex")
+  };
 }
 
 function normalizeTaskMasterTasks(parsed: unknown, sourcePath: string): ProjectTaskRecord[] {
@@ -267,6 +329,7 @@ function flattenTaskNode(
   }
 
   const taskId = String(value.id ?? `${parentId ?? "task"}-${accumulator.length + 1}`);
+  const relaydeskMetadata = asRecord(value.relaydesk);
   accumulator.push({
     id: taskId,
     sourceType: "taskmaster",
@@ -277,6 +340,15 @@ function flattenTaskNode(
     parentId,
     nestingLevel,
     sourcePath,
+    assignee:
+      readString(relaydeskMetadata ?? value, ["assignee", "owner", "assignedTo"]) ?? null,
+    notes: readString(relaydeskMetadata ?? value, ["notes", "note"]) ?? null,
+    blockedReason:
+      readString(relaydeskMetadata ?? value, ["blockedReason", "blocked_reason"]) ?? null,
+    boundSessionId:
+      readString(relaydeskMetadata ?? value, ["boundSessionId", "sessionId"]) ?? null,
+    boundRunId: readString(relaydeskMetadata ?? value, ["boundRunId", "runId"]) ?? null,
+    timeline: normalizeTaskTimeline(relaydeskMetadata?.timeline),
     updatedAt: readString(value, ["updatedAt", "updated_at", "lastUpdated", "modifiedAt"])
   });
 
@@ -299,6 +371,42 @@ function readString(value: Record<string, unknown>, fields: string[]): string | 
   }
 
   return null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizeTaskTimeline(raw: unknown): ProjectTaskTimelineEventRecord[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.flatMap((item, index) => {
+    const record = asRecord(item);
+    if (!record) {
+      return [];
+    }
+
+    const summary = readString(record, ["summary", "label", "title"]);
+    const type = readString(record, ["type"]) as ProjectTaskTimelineEventType | null;
+    const createdAt = readString(record, ["createdAt", "created_at", "timestamp"]);
+    if (!summary || !type || !createdAt) {
+      return [];
+    }
+
+    return [
+      {
+        id: String(record.id ?? `timeline-${index + 1}`),
+        type,
+        summary,
+        detail: readString(record, ["detail", "description"]),
+        createdAt
+      }
+    ];
+  });
 }
 
 function normalizeTaskStatus(rawStatus: string | null): ProjectTaskStatus {
@@ -363,4 +471,172 @@ function countTaskStatuses(tasks: ProjectTaskRecord[]): ProjectTaskStatusCounts 
   }
 
   return counts;
+}
+
+export async function findTaskMasterSourcePath(projectRootPath: string): Promise<string | null> {
+  const scannedPaths = TASKMASTER_CANDIDATE_RELATIVE_PATHS.map((relativePath) =>
+    path.join(projectRootPath, relativePath)
+  );
+  return findFirstExistingPath(scannedPaths);
+}
+
+export async function updateTaskMasterTask(
+  projectRootPath: string,
+  taskId: string,
+  mutation: TaskMutationInput,
+  options: {
+    expectedSyncToken?: string | null;
+    forceOverwrite?: boolean;
+  } = {}
+): Promise<string> {
+  const sourcePath = await findTaskMasterSourcePath(projectRootPath);
+  if (!sourcePath) {
+    throw new Error("TaskMaster source file not found");
+  }
+
+  const snapshot = await readTaskMasterSourceSnapshot(sourcePath);
+  if (
+    !options.forceOverwrite &&
+    options.expectedSyncToken &&
+    snapshot.syncToken.trim().length > 0 &&
+    options.expectedSyncToken !== snapshot.syncToken
+  ) {
+    throw new TaskMasterSyncConflictError({
+      sourcePath: snapshot.sourcePath,
+      sourceUpdatedAt: snapshot.sourceUpdatedAt,
+      currentSyncToken: snapshot.syncToken
+    });
+  }
+
+  const parsed = JSON.parse(snapshot.raw) as unknown;
+  const updatedAt = new Date().toISOString();
+
+  const updated = mutateTaskTree(parsed, taskId, (task) => {
+    if (mutation.status) {
+      task.status = mutation.status;
+    }
+
+    setStringField(task, "summary", mutation.summary);
+    setStringField(task, "updatedAt", updatedAt);
+
+    const relaydesk = ensureNestedRecord(task, "relaydesk");
+    setStringField(relaydesk, "assignee", mutation.assignee);
+    setStringField(relaydesk, "notes", mutation.notes);
+    setStringField(relaydesk, "blockedReason", mutation.blockedReason);
+    setStringField(relaydesk, "boundSessionId", mutation.boundSessionId);
+    setStringField(relaydesk, "boundRunId", mutation.boundRunId);
+
+    if (mutation.timelineEvent) {
+      const timeline = ensureArray(relaydesk, "timeline");
+      timeline.unshift({
+        id: `${taskId}-${Date.now()}`,
+        type: mutation.timelineEvent.type,
+        summary: mutation.timelineEvent.summary,
+        ...(mutation.timelineEvent.detail ? { detail: mutation.timelineEvent.detail } : {}),
+        createdAt: mutation.timelineEvent.createdAt ?? updatedAt
+      });
+    }
+
+    cleanupEmptyRelaydesk(relaydesk, task);
+  });
+
+  if (!updated) {
+    throw new Error("Task not found in TaskMaster file");
+  }
+
+  await writeFile(sourcePath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  return sourcePath;
+}
+
+function mutateTaskTree(
+  root: unknown,
+  taskId: string,
+  mutate: (task: Record<string, unknown>) => void
+): boolean {
+  const tasks = extractTaskArray(root);
+  return mutateTaskArray(tasks, taskId, mutate);
+}
+
+function mutateTaskArray(
+  tasks: unknown[],
+  taskId: string,
+  mutate: (task: Record<string, unknown>) => void
+): boolean {
+  for (const item of tasks) {
+    const task = asRecord(item);
+    if (!task) {
+      continue;
+    }
+
+    if (String(task.id ?? "") === taskId) {
+      mutate(task);
+      return true;
+    }
+
+    const subtasks = Array.isArray(task.subtasks)
+      ? task.subtasks
+      : Array.isArray(task.children)
+        ? task.children
+        : [];
+    if (mutateTaskArray(subtasks, taskId, mutate)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function ensureNestedRecord(
+  document: Record<string, unknown>,
+  key: string
+): Record<string, unknown> {
+  const existing = asRecord(document[key]);
+  if (existing) {
+    return existing;
+  }
+
+  const created: Record<string, unknown> = {};
+  document[key] = created;
+  return created;
+}
+
+function ensureArray(document: Record<string, unknown>, key: string): Record<string, unknown>[] {
+  if (Array.isArray(document[key])) {
+    return document[key] as Record<string, unknown>[];
+  }
+
+  const created: Record<string, unknown>[] = [];
+  document[key] = created;
+  return created;
+}
+
+function setStringField(
+  document: Record<string, unknown>,
+  key: string,
+  value: string | null | undefined
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null || value.trim().length === 0) {
+    delete document[key];
+    return;
+  }
+
+  document[key] = value.trim();
+}
+
+function cleanupEmptyRelaydesk(
+  relaydesk: Record<string, unknown>,
+  task: Record<string, unknown>
+): void {
+  const timeline = Array.isArray(relaydesk.timeline) ? relaydesk.timeline : [];
+  if (timeline.length === 0) {
+    delete relaydesk.timeline;
+  }
+
+  if (Object.keys(relaydesk).length === 0) {
+    delete task.relaydesk;
+  }
 }

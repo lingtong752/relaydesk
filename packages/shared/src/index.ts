@@ -1,4 +1,6 @@
 export type ProviderId = "mock" | "claude" | "codex" | "cursor" | "gemini";
+export type SessionRuntimeMode = "api_mode" | "cli_session_mode";
+export type SessionResumeStatus = "succeeded" | "failed" | "aborted";
 
 export type MessageRole = "human" | "surrogate" | "provider" | "system" | "tool";
 export type MessageStatus = "pending" | "streaming" | "completed" | "stopped" | "failed";
@@ -27,10 +29,23 @@ export interface ProjectRecord {
   updatedAt: string;
 }
 
-export type PluginSourceType = "builtin" | "local";
+export type PluginSourceType = "builtin" | "local" | "git";
 export type PluginFrontendComponentId = "project_pulse" | "delivery_radar";
-export type PluginBackendServiceKind = "none" | "context_snapshot";
-export type PluginActionPermission = "read_project" | "write_project";
+export type PluginFrontendRenderMode = "builtin" | "local_bundle" | "git_bundle";
+export type PluginBackendServiceKind = "none" | "context_snapshot" | "rpc_bridge";
+export const RELAYDESK_PLUGIN_HOST_API_VERSION = "1.0";
+export type PluginActionPermission =
+  | "read_project"
+  | "write_project"
+  | "execute_command"
+  | "read_host_context"
+  | "read_audit"
+  | "manage_git";
+export type PluginRpcHandlerId =
+  | "get_context_snapshot"
+  | "list_recent_audit_events"
+  | "list_task_board"
+  | "read_workspace_file";
 
 export interface PluginActionInputRecord {
   name: string;
@@ -52,6 +67,23 @@ export interface PluginActionRecord {
   timeoutMs?: number;
 }
 
+export interface PluginRpcMethodRecord {
+  id: string;
+  label: string;
+  description: string;
+  handler: PluginRpcHandlerId;
+  inputs: PluginActionInputRecord[];
+  permissions: PluginActionPermission[];
+}
+
+export interface PluginFrontendRecord {
+  type: PluginFrontendRenderMode;
+  apiVersion: string;
+  displayName: string;
+  builtinComponent?: PluginFrontendComponentId;
+  entry?: string | null;
+}
+
 export interface PluginActionExecutionRecord {
   pluginId: string;
   actionId: string;
@@ -67,28 +99,92 @@ export interface PluginActionExecutionRecord {
   executedAt: string;
 }
 
+export interface PluginRpcExecutionRecord {
+  pluginId: string;
+  rpcMethodId: string;
+  handler: PluginRpcHandlerId;
+  success: boolean;
+  durationMs: number;
+  executedAt: string;
+  result: Record<string, unknown> | null;
+  error?: string | null;
+}
+
+export interface PluginExecutionHistoryRecord {
+  id: string;
+  pluginId: string;
+  executionKind: "action" | "rpc";
+  title: string;
+  summary: string;
+  success: boolean;
+  durationMs: number;
+  executedAt: string;
+  actionId?: string;
+  rpcMethodId?: string;
+  details?: Record<string, unknown>;
+}
+
 export interface PluginCatalogRecord {
   id: string;
   sourceType: PluginSourceType;
   sourceRef?: string | null;
+  sourceVersion?: string | null;
   name: string;
   version: string;
   description: string;
   capabilities: string[];
   tabTitle: string;
   routeSegment: string;
+  frontend: PluginFrontendRecord;
   frontendComponent: PluginFrontendComponentId;
   backendService: PluginBackendServiceKind;
   actions: PluginActionRecord[];
+  rpcMethods: PluginRpcMethodRecord[];
 }
 
 export interface PluginInstallationRecord extends PluginCatalogRecord {
   installationId: string;
   projectId: string;
   sourceRef?: string | null;
+  sourceVersion?: string | null;
   enabled: boolean;
   installedAt: string;
   updatedAt: string;
+}
+
+export interface PluginFrontendModuleRecord {
+  installation: PluginInstallationRecord;
+  frontend: PluginInstallationRecord["frontend"];
+  entryPath: string;
+  code: string;
+  integrity: string;
+  hostApiVersion: string;
+}
+
+export interface PluginPreviewDiffRecord {
+  hasChanges: boolean;
+  changedFields: Array<
+    | "name"
+    | "version"
+    | "description"
+    | "tabTitle"
+    | "routeSegment"
+    | "frontendComponent"
+    | "backendService"
+    | "sourceType"
+    | "sourceRef"
+    | "sourceVersion"
+  >;
+  addedCapabilities: string[];
+  removedCapabilities: string[];
+  addedPermissions: PluginActionPermission[];
+  removedPermissions: PluginActionPermission[];
+  addedActions: string[];
+  removedActions: string[];
+  changedActions: string[];
+  addedRpcMethods: string[];
+  removedRpcMethods: string[];
+  changedRpcMethods: string[];
 }
 
 export type ProviderSettingsStatus = "configured" | "partial" | "not_found";
@@ -135,7 +231,7 @@ export interface ProjectSettingsSummary {
 }
 
 export interface ProjectSettingsUpdateInput {
-  provider: "claude" | "codex";
+  provider: "claude" | "codex" | "gemini";
   model?: string | null;
   reasoningEffort?: string | null;
   approvalPolicy?: string | null;
@@ -173,7 +269,18 @@ export interface SessionRecord {
   origin: "relaydesk" | "imported_cli";
   externalSessionId?: string;
   sourcePath?: string;
+  runtimeMode?: SessionRuntimeMode;
+  capabilities?: {
+    canSendMessages: boolean;
+    canResume: boolean;
+    canStartRuns: boolean;
+    canAttachTerminal: boolean;
+  };
   status: "idle" | "running" | "stopped";
+  lastResumeAttemptAt?: string;
+  lastResumedAt?: string;
+  lastResumeStatus?: SessionResumeStatus;
+  lastResumeError?: string | null;
   createdAt: string;
   updatedAt: string;
   lastMessageAt?: string;
@@ -261,6 +368,14 @@ export interface PluginHostContextRecord {
 export type ProjectTaskSourceType = "taskmaster" | "relaydesk";
 export type ProjectTaskStatus = "todo" | "in_progress" | "done" | "blocked" | "unknown";
 export type ProjectDocumentReferenceType = "prd" | "roadmap" | "backlog" | "test_report";
+export type ProjectTaskTimelineEventType =
+  | "synced"
+  | "status_changed"
+  | "note_updated"
+  | "blocked_reason_updated"
+  | "assignee_updated"
+  | "session_bound"
+  | "run_started";
 
 export interface ProjectDocumentReferenceRecord {
   id: string;
@@ -281,7 +396,21 @@ export interface ProjectTaskRecord {
   parentId?: string | null;
   nestingLevel: number;
   sourcePath?: string | null;
+  assignee?: string | null;
+  notes?: string | null;
+  blockedReason?: string | null;
+  boundSessionId?: string | null;
+  boundRunId?: string | null;
+  timeline: ProjectTaskTimelineEventRecord[];
   updatedAt?: string | null;
+}
+
+export interface ProjectTaskTimelineEventRecord {
+  id: string;
+  type: ProjectTaskTimelineEventType;
+  summary: string;
+  detail?: string | null;
+  createdAt: string;
 }
 
 export interface ProjectTaskStatusCounts {
@@ -295,6 +424,8 @@ export interface ProjectTaskStatusCounts {
 export interface TaskMasterSummaryRecord {
   available: boolean;
   sourcePath?: string | null;
+  sourceUpdatedAt?: string | null;
+  syncToken?: string | null;
   scannedPaths: string[];
   taskCount: number;
   counts: ProjectTaskStatusCounts;
@@ -324,11 +455,29 @@ export interface WorkspaceFileContent {
   updatedAt: string;
 }
 
+export interface TerminalSourceSessionRecord {
+  id: string;
+  title: string;
+  provider: ProviderId;
+  origin: SessionRecord["origin"];
+  runtimeMode?: SessionRuntimeMode;
+}
+
+export type TerminalBackendType = "shell" | "provider_cli";
+export type TerminalAttachMode = "direct_shell" | "live_attach" | "resume_bridge";
+
 export interface TerminalSessionRecord {
   id: string;
   projectId: string;
   cwd: string;
   shell: string;
+  backendType: TerminalBackendType;
+  provider?: ProviderId;
+  attachMode?: TerminalAttachMode;
+  supportsInput: boolean;
+  supportsResize: boolean;
+  fallbackReason?: string | null;
+  sourceSession?: TerminalSourceSessionRecord;
   createdAt: string;
 }
 
@@ -378,29 +527,90 @@ export const BUILTIN_PLUGIN_CATALOG: PluginCatalogRecord[] = [
     id: "project-pulse",
     sourceType: "builtin",
     sourceRef: null,
+    sourceVersion: null,
     name: "Project Pulse",
     version: "0.1.0",
     description: "把项目会话、Provider 分布和替身运行状态收口到一个插件视图里。",
     capabilities: ["summary", "sessions", "providers", "runs"],
     tabTitle: "Project Pulse",
     routeSegment: "pulse",
+    frontend: {
+      type: "builtin",
+      apiVersion: "1.0",
+      displayName: "Project Pulse",
+      builtinComponent: "project_pulse",
+      entry: null
+    },
     frontendComponent: "project_pulse",
     backendService: "context_snapshot",
-    actions: []
+    actions: [],
+    rpcMethods: [
+      {
+        id: "context-snapshot",
+        label: "读取宿主快照",
+        description: "获取当前项目的会话、运行与审批快照。",
+        handler: "get_context_snapshot",
+        inputs: [],
+        permissions: ["read_host_context"]
+      },
+      {
+        id: "task-board",
+        label: "读取任务看板",
+        description: "读取当前项目的 TaskMaster 与任务工作台摘要。",
+        handler: "list_task_board",
+        inputs: [],
+        permissions: ["read_project"]
+      }
+    ]
   },
   {
     id: "delivery-radar",
     sourceType: "builtin",
     sourceRef: null,
+    sourceVersion: null,
     name: "Delivery Radar",
     version: "0.1.0",
     description: "聚焦待审批项、运行节奏和最近会话，适合快速判断下一步动作。",
     capabilities: ["approvals", "activity", "runs"],
     tabTitle: "Delivery Radar",
     routeSegment: "radar",
+    frontend: {
+      type: "builtin",
+      apiVersion: "1.0",
+      displayName: "Delivery Radar",
+      builtinComponent: "delivery_radar",
+      entry: null
+    },
     frontendComponent: "delivery_radar",
     backendService: "context_snapshot",
-    actions: []
+    actions: [],
+    rpcMethods: [
+      {
+        id: "context-snapshot",
+        label: "读取宿主快照",
+        description: "获取当前项目的会话、运行与审批快照。",
+        handler: "get_context_snapshot",
+        inputs: [],
+        permissions: ["read_host_context"]
+      },
+      {
+        id: "recent-audit-events",
+        label: "读取最近审计事件",
+        description: "拉取最近的项目审计事件，便于做节奏判断。",
+        handler: "list_recent_audit_events",
+        inputs: [
+          {
+            name: "limit",
+            label: "数量",
+            description: "返回最近多少条事件，默认 10。",
+            placeholder: "10",
+            required: false,
+            defaultValue: "10"
+          }
+        ],
+        permissions: ["read_audit"]
+      }
+    ]
   }
 ];
 

@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { DiscoveredProjectRecord, ProjectRecord } from "@shared";
 import { getAuthUser } from "../auth.js";
-import { serializeApproval, serializeProject, serializeRun, serializeSession } from "../db.js";
+import { serializeApproval, serializeProject, serializeRun } from "../db.js";
 import { discoverLocalProjects } from "../services/projectDiscovery.js";
 import {
   findDiscoveredProjectByRoot,
@@ -14,6 +14,7 @@ import {
   normalizeRequestedProjectRootPath,
   resolveProjectRootPath
 } from "../services/projectRoot.js";
+import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(1),
@@ -182,7 +183,7 @@ export async function registerProjectRoutes(
           ...serializeProject(project),
           rootPath: resolvedRootPath
         },
-        sessions: sessions.map(serializeSession),
+        sessions: sessions.map((session) => serializeWorkspaceSession(session, app.cliSessionRunner)),
         activeRun: activeRun ? serializeRun(activeRun) : null,
         latestRun: latestRuns[0] ? serializeRun(latestRuns[0]) : null,
         pendingApprovals: pendingApprovals.map(serializeApproval)
