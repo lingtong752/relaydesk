@@ -4,13 +4,21 @@ import type {
   GitChangedFileRecord,
   GitDiffRecord,
   GitRemoteRecord,
-  GitStatusRecord
+  GitStatusRecord,
+  SessionRecord
 } from "@shared";
 import { api } from "../../../../lib/api";
+import {
+  getSessionOriginRuntimeLabel,
+  getSessionResumeStatusLabel,
+  getSessionStatusLabel
+} from "../../../../lib/sessionRuntime";
 import { EmptyState } from "../../../../shared/ui/EmptyState";
 import { SectionHeader } from "../../../../shared/ui/SectionHeader";
 
 interface GitWorkspaceProps {
+  boundSession?: SessionRecord | null;
+  onOpenBoundSession?(): void;
   projectId: string;
   token: string;
 }
@@ -23,7 +31,12 @@ function canStageFile(file: GitChangedFileRecord): boolean {
   return file.stagedStatus === "?" || (file.unstagedStatus !== " " && file.unstagedStatus !== "?");
 }
 
-export function GitWorkspace({ projectId, token }: GitWorkspaceProps): JSX.Element {
+export function GitWorkspace({
+  boundSession = null,
+  onOpenBoundSession,
+  projectId,
+  token
+}: GitWorkspaceProps): JSX.Element {
   const [status, setStatus] = useState<GitStatusRecord | null>(null);
   const [branches, setBranches] = useState<GitBranchRecord[]>([]);
   const [remotes, setRemotes] = useState<GitRemoteRecord[]>([]);
@@ -54,6 +67,10 @@ export function GitWorkspace({ projectId, token }: GitWorkspaceProps): JSX.Eleme
   const selectedRemote = useMemo(
     () => remotes.find((remote) => remote.name === remoteName) ?? null,
     [remoteName, remotes]
+  );
+  const boundSessionResumeLabel = useMemo(
+    () => getSessionResumeStatusLabel(boundSession),
+    [boundSession]
   );
   const currentBranchName = status?.branch ?? "";
 
@@ -324,6 +341,21 @@ export function GitWorkspace({ projectId, token }: GitWorkspaceProps): JSX.Eleme
 
       {error ? <div className="error-box">{error}</div> : null}
       {notice ? <div className="success-box">{notice}</div> : null}
+      {boundSession ? (
+        <div className="info-box">
+          当前从会话“{boundSession.title}”进入 Git 工作台。
+          {` ${boundSession.provider} · ${getSessionOriginRuntimeLabel(boundSession)} · 状态 ${getSessionStatusLabel(boundSession)}。`}
+          {boundSessionResumeLabel ? ` ${boundSessionResumeLabel}。` : ""}
+          {onOpenBoundSession ? (
+            <>
+              {" "}
+              <button className="secondary-button compact" onClick={onOpenBoundSession} type="button">
+                回到当前会话
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="git-toolbar">
         <div className="git-toolbar-card">

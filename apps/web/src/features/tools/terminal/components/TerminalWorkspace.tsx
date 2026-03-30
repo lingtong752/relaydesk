@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TerminalSessionRecord } from "@shared";
+import type { SessionRecord, TerminalSessionRecord } from "@shared";
 import { api } from "../../../../lib/api";
+import {
+  getSessionResumeStatusLabel,
+  getSessionStatusLabel
+} from "../../../../lib/sessionRuntime";
 import { connectTerminal, type TerminalClient, type TerminalEvent } from "../../../../lib/terminal";
 import { normalizeTerminalOutput } from "../../../../lib/terminalOutput";
 
 interface TerminalWorkspaceProps {
+  focusSourceSessionId?: string;
   projectId: string;
   rootPath: string;
   token: string;
+  workspaceSessions: SessionRecord[];
+  onOpenBoundSession?(sessionId: string): void;
 }
 
 type TerminalTabStatus = "idle" | "connecting" | "connected" | "exited";
@@ -37,10 +44,53 @@ function getTerminalStatusText(status: TerminalTabStatus): string {
   return "待连接";
 }
 
+function getSourceSessionRuntimeLabel(
+  sourceSession: TerminalSessionRecord["sourceSession"]
+): string {
+  if (!sourceSession) {
+    return "项目终端";
+  }
+
+  return sourceSession.origin === "imported_cli" ? "原生 CLI session" : "RelayDesk 托管会话";
+}
+
+function getTerminalBackendLabel(session: TerminalSessionRecord): string {
+  if (session.backendType === "provider_cli") {
+    return session.attachMode === "resume_bridge" ? "Provider CLI bridge" : "Provider CLI";
+  }
+
+  return "项目 shell";
+}
+
+function getTerminalCapabilityLabel(session: TerminalSessionRecord): string {
+  const capabilities = [
+    session.supportsInput ? "可输入" : "只读",
+    session.supportsResize ? "可缩放" : "固定尺寸"
+  ];
+  return capabilities.join(" · ");
+}
+
+function getTerminalTabTitle(session: TerminalSessionRecord): string {
+  return session.sourceSession?.title ?? session.shell.split("/").at(-1) ?? "shell";
+}
+
+function getTerminalTabMeta(session: TerminalSessionRecord, status: TerminalTabStatus): string {
+  const createdAt = new Date(session.createdAt).toLocaleTimeString();
+
+  if (session.sourceSession) {
+    return `${session.sourceSession.provider} · ${getTerminalBackendLabel(session)} · ${getTerminalStatusText(status)}`;
+  }
+
+  return `${createdAt} · ${getTerminalBackendLabel(session)} · ${getTerminalStatusText(status)}`;
+}
+
 export function TerminalWorkspace({
+  focusSourceSessionId,
   projectId,
   rootPath,
-  token
+  token,
+  workspaceSessions,
+  onOpenBoundSession
 }: TerminalWorkspaceProps): JSX.Element {
   const [sessions, setSessions] = useState<TerminalTabState[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
@@ -49,6 +99,7 @@ export function TerminalWorkspace({
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const outputRef = useRef<HTMLPreElement | null>(null);
   const sessionsRef = useRef<TerminalTabState[]>([]);
+  const lastFocusedSourceSessionRef = useRef<string | null>(null);
 
   const selectedSession = useMemo(
     () => sessions.find((session) => session.session.id === selectedSessionId) ?? null,
@@ -74,8 +125,24 @@ export function TerminalWorkspace({
     }
 
     const shellName = selectedSession.session.shell.split("/").at(-1) ?? "shell";
-    return `${shellName} · ${new Date(selectedSession.session.createdAt).toLocaleTimeString()}`;
+    if (selectedSession.session.sourceSession) {
+      return `${selectedSession.session.sourceSession.title} · ${selectedSession.session.sourceSession.provider} · ${getTerminalBackendLabel(selectedSession.session)} · ${shellName}`;
+    }
+
+    return `${shellName} · ${getTerminalBackendLabel(selectedSession.session)} · ${new Date(selectedSession.session.createdAt).toLocaleTimeString()}`;
   }, [selectedSession]);
+  const boundWorkspaceSession = useMemo(() => {
+    const sourceSessionId = selectedSession?.session.sourceSession?.id;
+    if (!sourceSessionId) {
+      return null;
+    }
+
+    return workspaceSessions.find((session) => session.id === sourceSessionId) ?? null;
+  }, [selectedSession, workspaceSessions]);
+  const boundWorkspaceSessionResumeLabel = useMemo(
+    () => getSessionResumeStatusLabel(boundWorkspaceSession),
+    [boundWorkspaceSession]
+  );
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -104,8 +171,24 @@ export function TerminalWorkspace({
     setSessions([]);
     setSelectedSessionId("");
     setWorkspaceError(null);
+    lastFocusedSourceSessionRef.current = null;
     void loadSessions(true);
   }, [projectId, token]);
+
+  useEffect(() => {
+    if (!focusSourceSessionId) {
+      lastFocusedSourceSessionRef.current = null;
+      return;
+    }
+
+    const requestKey = `${projectId}:${focusSourceSessionId}`;
+    if (lastFocusedSourceSessionRef.current === requestKey) {
+      return;
+    }
+
+    lastFocusedSourceSessionRef.current = requestKey;
+    void handleCreateSession(focusSourceSessionId);
+  }, [focusSourceSessionId, projectId]);
 
   async function loadSessions(autoSelect = false): Promise<void> {
     setLoadingSessions(true);
@@ -240,25 +323,35 @@ export function TerminalWorkspace({
     }
   }
 
-  async function handleCreateSession(): Promise<void> {
+  async function handleCreateSession(sourceSessionId?: string): Promise<void> {
     setAction("creating");
     try {
-      const response = await api.createTerminalSession(token, projectId);
-      setSessions((current) => [
-        {
+      const response = await api.createTerminalSession(token, projectId, {
+        ...(sourceSessionId ? { sourceSessionId } : {})
+      });
+      setSessions((current) => {
+        const existing = current.find((session) => session.session.id === response.session.id);
+        const nextEntry: TerminalTabState = {
           session: response.session,
-          client: null,
-          output: "",
-          command: "",
-          status: "idle",
-          error: null
-        },
-        ...current
-      ]);
+          client: existing?.client ?? null,
+          output: existing?.output ?? "",
+          command: existing?.command ?? "",
+          status: existing?.status ?? "idle",
+          error: existing?.error ?? null
+        };
+
+        return [
+          nextEntry,
+          ...current.filter((session) => session.session.id !== response.session.id)
+        ];
+      });
       setSelectedSessionId(response.session.id);
       setWorkspaceError(null);
       await ensureConnected(response.session.id);
     } catch (requestError) {
+      if (sourceSessionId) {
+        lastFocusedSourceSessionRef.current = null;
+      }
       setWorkspaceError(requestError instanceof Error ? requestError.message : "创建终端失败");
     } finally {
       setAction(null);
@@ -376,7 +469,7 @@ export function TerminalWorkspace({
           </button>
           <button
             className="secondary-button compact"
-            disabled={!selectedSession?.client}
+            disabled={!selectedSession?.client || !selectedSession.session.supportsInput}
             onClick={handleCtrlC}
             type="button"
           >
@@ -420,6 +513,42 @@ export function TerminalWorkspace({
 
       {workspaceError ? <div className="error-box">{workspaceError}</div> : null}
       {selectedSession?.error ? <div className="error-box">{selectedSession.error}</div> : null}
+      {selectedSession?.session.sourceSession && boundWorkspaceSession ? (
+        <div className="info-box">
+          当前终端已绑定到会话“{selectedSession.session.sourceSession.title}”。
+          {` ${selectedSession.session.sourceSession.provider} · ${getSourceSessionRuntimeLabel(selectedSession.session.sourceSession)}。`}
+          {` Terminal backend：${getTerminalBackendLabel(selectedSession.session)} · ${getTerminalCapabilityLabel(selectedSession.session)}。`}
+          {` 当前状态：${getSessionStatusLabel(boundWorkspaceSession)}。`}
+          {boundWorkspaceSessionResumeLabel ? ` ${boundWorkspaceSessionResumeLabel}。` : ""}
+          {selectedSession.session.fallbackReason ? ` ${selectedSession.session.fallbackReason}` : ""}
+          {` 你可以继续回到协作页处理这条会话。`}
+          {onOpenBoundSession ? (
+            <>
+              {" "}
+              <button
+                className="secondary-button compact"
+                onClick={() => onOpenBoundSession(boundWorkspaceSession.id)}
+                type="button"
+              >
+                回到当前会话
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : selectedSession?.session.sourceSession ? (
+        <div className="info-box">
+          当前终端已绑定到会话“{selectedSession.session.sourceSession.title}”。
+          {` ${selectedSession.session.sourceSession.provider} · ${getSourceSessionRuntimeLabel(selectedSession.session.sourceSession)}。`}
+          {` Terminal backend：${getTerminalBackendLabel(selectedSession.session)} · ${getTerminalCapabilityLabel(selectedSession.session)}。`}
+          {selectedSession.session.fallbackReason ? ` ${selectedSession.session.fallbackReason}` : ""}
+          当前工作区里的会话状态还在刷新中。
+        </div>
+      ) : (
+        <div className="info-box">
+          当前 Tab 是项目级 shell，没有绑定具体会话。
+          {selectedSession ? ` 当前 backend：${getTerminalBackendLabel(selectedSession.session)}。` : ""}
+        </div>
+      )}
 
       {sessions.length === 0 ? (
         <div className="info-box">
@@ -434,9 +563,9 @@ export function TerminalWorkspace({
               onClick={() => setSelectedSessionId(session.session.id)}
               type="button"
             >
-              <strong>{session.session.shell.split("/").at(-1) ?? "shell"}</strong>
+              <strong>{getTerminalTabTitle(session.session)}</strong>
               <span className="terminal-tab-meta">
-                {new Date(session.session.createdAt).toLocaleTimeString()} · {getTerminalStatusText(session.status)}
+                {getTerminalTabMeta(session.session, session.status)}
               </span>
             </button>
           ))}
@@ -449,7 +578,7 @@ export function TerminalWorkspace({
 
       <form className="terminal-form" onSubmit={handleSendCommand}>
         <input
-          disabled={!selectedSession?.client}
+          disabled={!selectedSession?.client || !selectedSession.session.supportsInput}
           onChange={(event) => {
             if (!selectedSession) {
               return;
@@ -460,12 +589,22 @@ export function TerminalWorkspace({
               command: event.target.value
             }));
           }}
-          placeholder={selectedSession?.client ? "输入命令并回车" : "先连接或选中一个终端 Tab"}
+          placeholder={
+            !selectedSession?.client
+              ? "先连接或选中一个终端 Tab"
+              : selectedSession.session.supportsInput
+                ? "输入命令并回车"
+                : "当前 terminal backend 为只读"
+          }
           value={selectedSession?.command ?? ""}
         />
         <button
           className="primary-button"
-          disabled={!selectedSession?.client || !selectedSession.command.trim()}
+          disabled={
+            !selectedSession?.client ||
+            !selectedSession.session.supportsInput ||
+            !selectedSession.command.trim()
+          }
           type="submit"
         >
           发送命令

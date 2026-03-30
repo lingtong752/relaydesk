@@ -1,4 +1,5 @@
 import type { ProviderId } from "@shared";
+import type { ProviderTerminalSupport } from "./types.js";
 
 export function normalizeContent(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -19,4 +20,26 @@ export function buildUnsupportedProviderReply(prompt: string, provider: Provider
     `我已经记录这次请求：“${prompt.trim()}”。`,
     "现阶段请优先使用 mock、claude、codex 或 gemini 会话。"
   ].join(" ");
+}
+
+export function buildShellTerminalSupport(
+  fallbackReason?: string | null
+): ProviderTerminalSupport {
+  return {
+    backendType: "shell",
+    attachMode: "direct_shell",
+    supportsInput: true,
+    supportsResize: true,
+    fallbackReason: fallbackReason ?? null
+  };
+}
+
+export function buildProviderCliBridgeSupport(): ProviderTerminalSupport {
+  return {
+    backendType: "provider_cli",
+    attachMode: "resume_bridge",
+    supportsInput: true,
+    supportsResize: true,
+    fallbackReason: null
+  };
 }

@@ -41,12 +41,68 @@ interface TerminalSession {
   ownerId: string;
   cwd: string;
   shell: string;
+  backendType: TerminalSessionRecord["backendType"];
+  provider?: TerminalSessionRecord["provider"];
+  attachMode?: TerminalSessionRecord["attachMode"];
+  supportsInput: boolean;
+  supportsResize: boolean;
+  fallbackReason?: string | null;
+  sourceSession?: TerminalSessionRecord["sourceSession"];
   createdAt: Date;
-  pty: IPty;
+  backend: TerminalBackend;
   sockets: Set<WebSocket>;
   buffer: string;
   cleanupTimer?: NodeJS.Timeout;
 }
+
+interface TerminalBackend {
+  shell: string;
+  onData(listener: (chunk: string) => void): void;
+  onExit(listener: (event: { exitCode: number; signal?: number }) => void): void;
+  write(input: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+}
+
+interface TerminalBackendDescriptor {
+  type: TerminalSessionRecord["backendType"];
+  provider?: TerminalSessionRecord["provider"];
+  attachMode?: TerminalSessionRecord["attachMode"];
+  supportsInput: boolean;
+  supportsResize: boolean;
+  fallbackReason?: string | null;
+}
+
+class PtyTerminalBackend implements TerminalBackend {
+  constructor(
+    readonly shell: string,
+    private readonly pty: IPty
+  ) {}
+
+  onData(listener: (chunk: string) => void): void {
+    this.pty.onData(listener);
+  }
+
+  onExit(listener: (event: { exitCode: number; signal?: number }) => void): void {
+    this.pty.onExit(listener);
+  }
+
+  write(input: string): void {
+    this.pty.write(input);
+  }
+
+  resize(cols: number, rows: number): void {
+    this.pty.resize(cols, rows);
+  }
+
+  kill(): void {
+    this.pty.kill();
+  }
+}
+
+class ShellTerminalBackend extends PtyTerminalBackend {}
+
+class ProviderCliTerminalBackend extends PtyTerminalBackend {}
 
 export class TerminalManagerError extends Error {
   constructor(
@@ -119,11 +175,34 @@ export async function ensureExecutablePermissions(filePath: string | null): Prom
 export class TerminalManager {
   private readonly sessions = new Map<string, TerminalSession>();
 
-  async createSession(input: {
-    ownerId: string;
-    projectId: string;
+  protected buildDefaultBackendDescriptor(
+    input: Pick<TerminalSession, "sourceSession">
+  ): TerminalBackendDescriptor {
+    if (input.sourceSession?.provider && input.sourceSession.runtimeMode === "cli_session_mode") {
+      return {
+        type: "provider_cli",
+        provider: input.sourceSession.provider,
+        attachMode: "resume_bridge",
+        supportsInput: true,
+        supportsResize: true,
+        fallbackReason: null
+      };
+    }
+
+    return {
+      type: "shell",
+      provider: input.sourceSession?.provider,
+      attachMode: "direct_shell",
+      supportsInput: true,
+      supportsResize: true,
+      fallbackReason: null
+    };
+  }
+
+  protected async createPtyBackend(input: {
     cwd: string;
-  }): Promise<TerminalSessionRecord> {
+    backend: TerminalBackendDescriptor;
+  }): Promise<TerminalBackend> {
     await mkdir(input.cwd, { recursive: true });
     let nodePtyRuntime: NodePtyRuntime;
     try {
@@ -149,26 +228,72 @@ export class TerminalManager {
         rows: 32,
         env: {
           ...process.env,
-          TERM: "xterm-256color"
+          TERM: "xterm-256color",
+          RELAYDESK_TERMINAL_BACKEND: input.backend.type,
+          ...(input.backend.provider ? { RELAYDESK_TERMINAL_PROVIDER: input.backend.provider } : {}),
+          ...(input.backend.attachMode ? { RELAYDESK_TERMINAL_ATTACH_MODE: input.backend.attachMode } : {})
         }
       });
     } catch (error) {
       throw this.toTerminalManagerError(error, shell);
     }
 
+    if (input.backend.type === "provider_cli") {
+      return new ProviderCliTerminalBackend(shell, terminal);
+    }
+
+    return new ShellTerminalBackend(shell, terminal);
+  }
+
+  async createSession(input: {
+    ownerId: string;
+    projectId: string;
+    cwd: string;
+    sourceSession?: TerminalSessionRecord["sourceSession"];
+    backend?: Partial<TerminalBackendDescriptor>;
+  }): Promise<TerminalSessionRecord> {
+    const backendDescriptor = {
+      ...this.buildDefaultBackendDescriptor({ sourceSession: input.sourceSession }),
+      ...input.backend
+    } satisfies TerminalBackendDescriptor;
+    const backend = await this.createPtyBackend({
+      cwd: input.cwd,
+      backend: backendDescriptor
+    });
+
     const session: TerminalSession = {
       id: randomUUID(),
       projectId: input.projectId,
       ownerId: input.ownerId,
       cwd: input.cwd,
-      shell,
+      shell: backend.shell,
+      backendType: backendDescriptor.type,
+      provider: backendDescriptor.provider,
+      attachMode: backendDescriptor.attachMode,
+      supportsInput: backendDescriptor.supportsInput,
+      supportsResize: backendDescriptor.supportsResize,
+      fallbackReason: backendDescriptor.fallbackReason ?? null,
+      sourceSession: input.sourceSession,
       createdAt: new Date(),
-      pty: terminal,
+      backend,
       sockets: new Set(),
       buffer: ""
     };
 
-    terminal.onData((chunk) => {
+    if (session.backendType === "provider_cli" && session.sourceSession) {
+      session.buffer = [
+        `[RelayDesk] provider terminal attached to ${session.sourceSession.provider}.`,
+        session.attachMode === "resume_bridge"
+          ? "[RelayDesk] current mode: resume bridge. Live TTY attach will be added in a later iteration."
+          : `[RelayDesk] current mode: ${session.attachMode ?? "unknown"}.`,
+        session.fallbackReason ? `[RelayDesk] note: ${session.fallbackReason}` : null,
+        ""
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    backend.onData((chunk) => {
       session.buffer = `${session.buffer}${chunk}`;
       if (session.buffer.length > OUTPUT_BUFFER_LIMIT) {
         session.buffer = session.buffer.slice(-OUTPUT_BUFFER_LIMIT);
@@ -186,7 +311,7 @@ export class TerminalManager {
       }
     });
 
-    terminal.onExit(({ exitCode, signal }) => {
+    backend.onExit(({ exitCode, signal }) => {
       const payload = JSON.stringify({
         type: "terminal.exit",
         payload: { exitCode, signal }
@@ -219,6 +344,21 @@ export class TerminalManager {
       .filter((session) => session.projectId === projectId && session.ownerId === ownerId)
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((session) => this.serializeSession(session));
+  }
+
+  findSessionBySourceSession(
+    projectId: string,
+    ownerId: string,
+    sourceSessionId: string
+  ): TerminalSessionRecord | null {
+    const session = Array.from(this.sessions.values()).find(
+      (entry) =>
+        entry.projectId === projectId &&
+        entry.ownerId === ownerId &&
+        entry.sourceSession?.id === sourceSessionId
+    );
+
+    return session ? this.serializeSession(session) : null;
   }
 
   attachSocket(sessionId: string, ownerId: string, socket: WebSocket): TerminalSession {
@@ -256,12 +396,20 @@ export class TerminalManager {
 
   writeInput(sessionId: string, ownerId: string, input: string): void {
     const session = this.getSession(sessionId, ownerId);
-    session.pty.write(input);
+    if (!session.supportsInput) {
+      throw new TerminalManagerError(400, "This terminal backend does not accept input");
+    }
+
+    session.backend.write(input);
   }
 
   resize(sessionId: string, ownerId: string, cols: number, rows: number): void {
     const session = this.getSession(sessionId, ownerId);
-    session.pty.resize(Math.max(20, cols), Math.max(8, rows));
+    if (!session.supportsResize) {
+      throw new TerminalManagerError(400, "This terminal backend does not support resize");
+    }
+
+    session.backend.resize(Math.max(20, cols), Math.max(8, rows));
   }
 
   closeSession(sessionId: string, ownerId: string): void {
@@ -280,7 +428,7 @@ export class TerminalManager {
     }
 
     try {
-      session.pty.kill();
+      session.backend.kill();
     } catch {
       // Ignore errors during cleanup.
     }
@@ -300,6 +448,13 @@ export class TerminalManager {
       projectId: session.projectId,
       cwd: session.cwd,
       shell: session.shell,
+      backendType: session.backendType,
+      provider: session.provider,
+      attachMode: session.attachMode,
+      supportsInput: session.supportsInput,
+      supportsResize: session.supportsResize,
+      fallbackReason: session.fallbackReason ?? null,
+      sourceSession: session.sourceSession,
       createdAt: session.createdAt.toISOString()
     };
   }

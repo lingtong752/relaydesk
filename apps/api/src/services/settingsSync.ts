@@ -32,6 +32,12 @@ interface ClaudeConfigPaths {
   projectMcpPath: string;
 }
 
+interface GeminiConfigPaths {
+  globalSettingsPath: string;
+  projectSettingsPath: string;
+  antigravityMcpPath: string;
+}
+
 interface TomlSectionBlock {
   headerLine: string;
   name: string;
@@ -66,6 +72,12 @@ export async function saveProjectSettings(
     });
   } else if (options.update.provider === "codex") {
     await saveCodexSettings({
+      homeDir,
+      projectRootPath: options.projectRootPath,
+      update: options.update
+    });
+  } else if (options.update.provider === "gemini") {
+    await saveGeminiSettings({
       homeDir,
       projectRootPath: options.projectRootPath,
       update: options.update
@@ -284,8 +296,63 @@ async function saveCodexSettings(input: {
   });
 }
 
+async function saveGeminiSettings(input: {
+  homeDir: string;
+  projectRootPath: string;
+  update: ProjectSettingsUpdateInput;
+}): Promise<void> {
+  const paths: GeminiConfigPaths = {
+    globalSettingsPath: path.join(input.homeDir, ".gemini", "settings.json"),
+    projectSettingsPath: path.join(input.projectRootPath, ".gemini", "settings.json"),
+    antigravityMcpPath: path.join(input.homeDir, ".gemini", "antigravity", "mcp_config.json")
+  };
+
+  const topLevelTargetPath = await chooseGeminiTopLevelTarget(paths);
+  const normalizedServers = normalizeEditableMcpServers(input.update.mcpServers ?? []);
+  const groupedServers = splitGeminiServers(normalizedServers, paths);
+
+  await updateJsonFile(topLevelTargetPath, (document) => {
+    setStringOrDelete(document, "model", normalizeOptionalString(input.update.model));
+    setStringOrDelete(
+      document,
+      "reasoningEffort",
+      normalizeOptionalString(input.update.reasoningEffort)
+    );
+    setStringOrDelete(document, "approvalPolicy", normalizeOptionalString(input.update.approvalPolicy));
+    setStringOrDelete(document, "sandboxMode", normalizeOptionalString(input.update.sandboxMode));
+    setStringArrayOrDelete(document, "allowedTools", normalizeStringList(input.update.allowedTools));
+    setStringArrayOrDelete(
+      document,
+      "disallowedTools",
+      normalizeStringList(input.update.disallowedTools)
+    );
+    delete document.mcpServers;
+  });
+
+  await updateJsonFile(paths.projectSettingsPath, (document) => {
+    if (topLevelTargetPath !== paths.projectSettingsPath) {
+      delete document.model;
+      delete document.reasoningEffort;
+      delete document.approvalPolicy;
+      delete document.sandboxMode;
+      delete document.allowedTools;
+      delete document.disallowedTools;
+    }
+
+    setRecordOrDelete(document, "mcpServers", buildGeminiMcpRecord(groupedServers.projectServers));
+  });
+
+  await updateJsonFile(paths.antigravityMcpPath, (document) => {
+    setRecordOrDelete(document, "mcpServers", buildGeminiMcpRecord(groupedServers.globalServers));
+  });
+}
+
 async function chooseCodexTopLevelTarget(paths: CodexConfigPaths): Promise<string> {
   return (await fileExists(paths.projectPath)) ? paths.projectPath : paths.globalPath;
+}
+
+async function chooseGeminiTopLevelTarget(paths: GeminiConfigPaths): Promise<string> {
+  return paths.projectSettingsPath;
 }
 
 function splitCodexServers(
@@ -322,6 +389,54 @@ function splitCodexServers(
     projectServers.push({
       ...server,
       sourcePath: paths.projectPath
+    });
+  }
+
+  return {
+    globalServers: dedupeServersByName(globalServers),
+    projectServers: dedupeServersByName(projectServers)
+  };
+}
+
+function splitGeminiServers(
+  servers: CliMcpServerRecord[],
+  paths: GeminiConfigPaths
+): {
+  globalServers: CliMcpServerRecord[];
+  projectServers: CliMcpServerRecord[];
+} {
+  const normalizedGlobalSettingsPath = path.resolve(paths.globalSettingsPath);
+  const normalizedProjectSettingsPath = path.resolve(paths.projectSettingsPath);
+  const normalizedAntigravityPath = path.resolve(paths.antigravityMcpPath);
+
+  const globalServers: CliMcpServerRecord[] = [];
+  const projectServers: CliMcpServerRecord[] = [];
+
+  for (const server of servers) {
+    const normalizedSourcePath = server.sourcePath ? safeResolve(server.sourcePath) : null;
+    if (
+      server.scope === "global" ||
+      normalizedSourcePath === normalizedGlobalSettingsPath ||
+      normalizedSourcePath === normalizedAntigravityPath
+    ) {
+      globalServers.push({
+        ...server,
+        sourcePath: paths.antigravityMcpPath
+      });
+      continue;
+    }
+
+    if (normalizedSourcePath === normalizedProjectSettingsPath || server.scope === "project") {
+      projectServers.push({
+        ...server,
+        sourcePath: paths.projectSettingsPath
+      });
+      continue;
+    }
+
+    projectServers.push({
+      ...server,
+      sourcePath: paths.projectSettingsPath
     });
   }
 
@@ -473,6 +588,23 @@ function createCodexMcpSection(server: CliMcpServerRecord): TomlSectionBlock {
     name: `mcp_servers.${server.name}`,
     lines
   };
+}
+
+function buildGeminiMcpRecord(servers: CliMcpServerRecord[]): Record<string, JsonValue> | null {
+  if (servers.length === 0) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    servers.map((server) => [
+      server.name,
+      {
+        ...(server.command ? { command: server.command } : {}),
+        ...(server.url ? { url: server.url } : {}),
+        ...(typeof server.enabled === "boolean" ? { enabled: server.enabled } : {})
+      }
+    ])
+  );
 }
 
 function matchesManagedTomlKey(line: string, keys: Set<string>): boolean {

@@ -98,6 +98,28 @@ function createSettingsSummary(): ProjectSettingsSummary {
           }
         ],
         notes: []
+      },
+      {
+        provider: "gemini",
+        status: "configured",
+        summary: "model=gemini-2.5-pro · reasoning=medium · approval=on-request · 1 个允许工具",
+        sources: [
+          {
+            label: "Gemini 全局 settings",
+            path: "/Users/test/.gemini/settings.json",
+            scope: "global",
+            exists: true
+          }
+        ],
+        model: "gemini-2.5-pro",
+        reasoningEffort: "medium",
+        approvalPolicy: "on-request",
+        sandboxMode: "workspace-write",
+        toolPermissionMode: "approval=on-request · sandbox=workspace-write",
+        allowedTools: ["ReadFile"],
+        disallowedTools: [],
+        mcpServers: [],
+        notes: []
       }
     ]
   };
@@ -121,10 +143,12 @@ describe("ProjectSettingsOverview", () => {
     expect(markup).toContain("Codex");
     expect(markup).toContain("Claude");
     expect(markup).toContain("Cursor");
+    expect(markup).toContain("Gemini");
     expect(markup).toContain("playwright");
     expect(markup).toContain("browser");
     expect(markup).toContain("保存到本地 CLI");
     expect(markup).toContain("当前 provider 仍是只读摘要");
+    expect(markup).toContain("Claude / Codex / Gemini 已支持写回本地配置");
     expect(markup).toContain("项目级 `.codex/config.toml` 的同名配置会覆盖全局设置。");
   });
 });

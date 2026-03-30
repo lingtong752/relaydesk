@@ -10,9 +10,14 @@ import type {
   MessageRecord,
   PluginActionExecutionRecord,
   PluginCatalogRecord,
+  PluginExecutionHistoryRecord,
+  PluginFrontendModuleRecord,
   PluginHostContextRecord,
   PluginInstallationRecord,
+  PluginPreviewDiffRecord,
+  PluginRpcExecutionRecord,
   ProjectTaskBoardRecord,
+  ProjectTaskRecord,
   ProjectSettingsUpdateInput,
   ProjectSettingsSummary,
   ProjectRecord,
@@ -26,7 +31,19 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:4010";
 
-type HttpMethod = "GET" | "POST";
+type HttpMethod = "GET" | "POST" | "PATCH";
+
+export class ApiRequestError extends Error {
+  readonly statusCode: number;
+  readonly payload: unknown;
+
+  constructor(message: string, statusCode: number, payload: unknown) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.statusCode = statusCode;
+    this.payload = payload;
+  }
+}
 
 async function request<T>(
   path: string,
@@ -49,7 +66,11 @@ async function request<T>(
 
   if (!response.ok) {
     const error = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(error?.message ?? `Request failed with ${response.status}`);
+    throw new ApiRequestError(
+      error?.message ?? `Request failed with ${response.status}`,
+      response.status,
+      error
+    );
   }
 
   return response.json() as Promise<T>;
@@ -110,6 +131,60 @@ export const api = {
   getProjectTaskBoard(token: string, projectId: string): Promise<{ board: ProjectTaskBoardRecord }> {
     return request(`/api/projects/${projectId}/tasks`, { token });
   },
+  updateProjectTask(
+    token: string,
+    projectId: string,
+    taskId: string,
+    body: {
+      status?: ProjectTaskRecord["status"];
+      summary?: string | null;
+      assignee?: string | null;
+      notes?: string | null;
+      blockedReason?: string | null;
+      boundSessionId?: string | null;
+      boundRunId?: string | null;
+      expectedSyncToken?: string | null;
+      forceOverwrite?: boolean;
+    }
+  ): Promise<{ board: ProjectTaskBoardRecord; task: ProjectTaskRecord | null }> {
+    return request(`/api/projects/${projectId}/tasks/${taskId}`, {
+      method: "PATCH",
+      token,
+      body
+    });
+  },
+  syncProjectTasks(
+    token: string,
+    projectId: string
+  ): Promise<{ board: ProjectTaskBoardRecord }> {
+    return request(`/api/projects/${projectId}/tasks/sync`, {
+      method: "POST",
+      token
+    });
+  },
+  startTaskRun(
+    token: string,
+    projectId: string,
+    taskId: string,
+    body: {
+      sessionId: string;
+      objective?: string;
+      constraints: string;
+      expectedSyncToken?: string | null;
+      forceOverwrite?: boolean;
+    }
+  ): Promise<{
+    board: ProjectTaskBoardRecord;
+    task: ProjectTaskRecord | null;
+    run: RunRecord;
+    approval: ApprovalRecord | null;
+  }> {
+    return request(`/api/projects/${projectId}/tasks/${taskId}/start-run`, {
+      method: "POST",
+      token,
+      body
+    });
+  },
   listPluginCatalog(token: string, projectId: string): Promise<{ plugins: PluginCatalogRecord[] }> {
     return request(`/api/projects/${projectId}/plugins/catalog`, { token });
   },
@@ -122,12 +197,38 @@ export const api = {
   installProjectPlugin(
     token: string,
     projectId: string,
-    pluginId: string
+    body: {
+      pluginId?: string;
+      sourceType?: "local" | "git";
+      sourceRef?: string;
+      sourceVersion?: string | null;
+    }
   ): Promise<{ installation: PluginInstallationRecord }> {
     return request(`/api/projects/${projectId}/plugins/install`, {
       method: "POST",
       token,
-      body: { pluginId }
+      body
+    });
+  },
+  previewProjectPlugin(
+    token: string,
+    projectId: string,
+    body: {
+      pluginId?: string;
+      sourceType?: "local" | "git";
+      sourceRef?: string;
+      sourceVersion?: string | null;
+    }
+  ): Promise<{
+    plugin: PluginCatalogRecord;
+    alreadyInstalled: boolean;
+    installation: PluginInstallationRecord | null;
+    diff: PluginPreviewDiffRecord | null;
+  }> {
+    return request(`/api/projects/${projectId}/plugins/preview`, {
+      method: "POST",
+      token,
+      body
     });
   },
   updateProjectPluginState(
@@ -142,6 +243,30 @@ export const api = {
       body: { enabled }
     });
   },
+  upgradeProjectPlugin(
+    token: string,
+    projectId: string,
+    pluginId: string
+  ): Promise<{ installation: PluginInstallationRecord }> {
+    return request(`/api/projects/${projectId}/plugins/${pluginId}/upgrade`, {
+      method: "POST",
+      token
+    });
+  },
+  uninstallProjectPlugin(
+    token: string,
+    projectId: string,
+    pluginId: string
+  ): Promise<{
+    ok: boolean;
+    installation: PluginInstallationRecord;
+    retainedHistoryCount: number;
+  }> {
+    return request(`/api/projects/${projectId}/plugins/${pluginId}/uninstall`, {
+      method: "POST",
+      token
+    });
+  },
   getProjectPluginContext(
     token: string,
     projectId: string,
@@ -151,6 +276,28 @@ export const api = {
     context: PluginHostContextRecord;
   }> {
     return request(`/api/projects/${projectId}/plugins/${pluginId}/context`, {
+      token
+    });
+  },
+  getProjectPluginFrontendModule(
+    token: string,
+    projectId: string,
+    pluginId: string
+  ): Promise<PluginFrontendModuleRecord> {
+    return request(`/api/projects/${projectId}/plugins/${pluginId}/frontend/module`, {
+      token
+    });
+  },
+  getProjectPluginHistory(
+    token: string,
+    projectId: string,
+    pluginId: string,
+    limit = 20
+  ): Promise<{
+    installation: PluginInstallationRecord;
+    history: PluginExecutionHistoryRecord[];
+  }> {
+    return request(`/api/projects/${projectId}/plugins/${pluginId}/history?limit=${limit}`, {
       token
     });
   },
@@ -170,10 +317,26 @@ export const api = {
       body
     });
   },
+  executeProjectPluginRpc(
+    token: string,
+    projectId: string,
+    pluginId: string,
+    rpcMethodId: string,
+    body: { inputs: Record<string, string> }
+  ): Promise<{
+    installation: PluginInstallationRecord;
+    execution: PluginRpcExecutionRecord;
+  }> {
+    return request(`/api/projects/${projectId}/plugins/${pluginId}/rpc/${rpcMethodId}/execute`, {
+      method: "POST",
+      token,
+      body
+    });
+  },
   saveProjectProviderSettings(
     token: string,
     projectId: string,
-    provider: "claude" | "codex",
+    provider: "claude" | "codex" | "gemini",
     body: Omit<ProjectSettingsUpdateInput, "provider">
   ): Promise<{ settings: ProjectSettingsSummary }> {
     return request(`/api/projects/${projectId}/settings/providers/${provider}`, {
@@ -356,11 +519,13 @@ export const api = {
   },
   createTerminalSession(
     token: string,
-    projectId: string
+    projectId: string,
+    body: { sourceSessionId?: string } = {}
   ): Promise<{ session: TerminalSessionRecord }> {
     return request(`/api/projects/${projectId}/terminal/session`, {
       method: "POST",
-      token
+      token,
+      body
     });
   },
   listTerminalSessions(

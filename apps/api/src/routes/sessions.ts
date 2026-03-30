@@ -5,9 +5,9 @@ import { getAuthUser } from "../auth.js";
 import {
   parseObjectId,
   serializeMessage,
-  serializeSession
 } from "../db.js";
 import { listImportedCliConversationMessages } from "../services/importedCliSessions.js";
+import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 import {
   streamImportedCliSessionMessage,
   streamProviderMessage
@@ -46,7 +46,9 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         .sort({ updatedAt: -1 })
         .toArray();
 
-      return { sessions: sessions.map(serializeSession) };
+      return {
+        sessions: sessions.map((session) => serializeWorkspaceSession(session, app.cliSessionRunner))
+      };
     }
   );
 
@@ -75,6 +77,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         provider: parsedBody.data.provider,
         title: parsedBody.data.title,
         origin: "relaydesk" as const,
+        runtimeMode: "api_mode" as const,
         status: "idle" as const,
         createdAt: now,
         updatedAt: now
@@ -86,7 +89,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         return reply.code(500).send({ message: "Failed to create session" });
       }
 
-      return { session: serializeSession(created) };
+      return { session: serializeWorkspaceSession(created, app.cliSessionRunner) };
     }
   );
 

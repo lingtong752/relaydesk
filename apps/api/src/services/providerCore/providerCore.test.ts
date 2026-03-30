@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
 import { buildGeminiContents } from "./adapters/geminiAdapter.js";
-import { getProviderAdapter, generateProviderReply, listRegisteredProviders } from "./index.js";
+import {
+  getProviderAdapter,
+  generateProviderReply,
+  getProviderTerminalSupport,
+  listRegisteredProviders
+} from "./index.js";
 
 describe("provider core registry", () => {
   it("registers the current concrete adapters behind a shared provider-core entrypoint", () => {
@@ -22,6 +27,32 @@ describe("provider core registry", () => {
 
     expect(reply).toContain("cursor");
     expect(reply).toContain("还没有接入");
+  });
+
+  it("describes provider terminal support without coupling callers to adapter details", () => {
+    expect(
+      getProviderTerminalSupport({
+        provider: "codex",
+        runtimeMode: "cli_session_mode",
+        origin: "imported_cli"
+      })
+    ).toMatchObject({
+      backendType: "provider_cli",
+      attachMode: "resume_bridge",
+      supportsInput: true,
+      supportsResize: true
+    });
+
+    expect(
+      getProviderTerminalSupport({
+        provider: "mock",
+        runtimeMode: "api_mode",
+        origin: "relaydesk"
+      })
+    ).toMatchObject({
+      backendType: "shell",
+      attachMode: "direct_shell"
+    });
   });
 
   it("maps RelayDesk history into Gemini contents with merged turns", () => {

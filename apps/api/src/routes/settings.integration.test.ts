@@ -243,6 +243,90 @@ describe("settings routes integration", () => {
     expect(globalToml).toContain('command = "npx playwright-mcp"');
     expect(globalToml).not.toContain('model_reasoning_effort = "high"');
   });
+
+  it("writes Gemini provider settings back to settings.json and antigravity MCP files", async () => {
+    const { projectId, authHeader } = await createProjectAndAuth(app, workspaceRoot);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/settings/providers/gemini`,
+      headers: authHeader,
+      payload: {
+        model: "gemini-2.5-flash",
+        reasoningEffort: "medium",
+        approvalPolicy: "on-request",
+        sandboxMode: "workspace-write",
+        allowedTools: ["ReadFile", "Search"],
+        disallowedTools: ["DeleteFile"],
+        mcpServers: [
+          {
+            provider: "gemini",
+            name: "workspace",
+            scope: "global",
+            sourcePath: path.join(configHomeDir, ".gemini", "antigravity", "mcp_config.json"),
+            transport: "stdio",
+            command: "gemini-workspace-mcp",
+            enabled: true
+          },
+          {
+            provider: "gemini",
+            name: "docs",
+            scope: "project",
+            sourcePath: path.join(workspaceRoot, ".gemini", "settings.json"),
+            transport: "sse",
+            url: "http://127.0.0.1:4222/sse",
+            enabled: false
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as {
+      settings: {
+        providers: Array<{ provider: string; model?: string | null; allowedTools: string[] }>;
+      };
+    };
+    const gemini = body.settings.providers.find((provider) => provider.provider === "gemini");
+    expect(gemini).toEqual(
+      expect.objectContaining({
+        model: "gemini-2.5-flash",
+        allowedTools: ["ReadFile", "Search"]
+      })
+    );
+
+    const projectSettings = JSON.parse(
+      await readFile(path.join(workspaceRoot, ".gemini", "settings.json"), "utf8")
+    ) as {
+      model?: string;
+      reasoningEffort?: string;
+      approvalPolicy?: string;
+      sandboxMode?: string;
+      allowedTools?: string[];
+      disallowedTools?: string[];
+      mcpServers?: Record<string, { url?: string; enabled?: boolean }>;
+    };
+    expect(projectSettings.model).toBe("gemini-2.5-flash");
+    expect(projectSettings.reasoningEffort).toBe("medium");
+    expect(projectSettings.approvalPolicy).toBe("on-request");
+    expect(projectSettings.sandboxMode).toBe("workspace-write");
+    expect(projectSettings.allowedTools).toEqual(["ReadFile", "Search"]);
+    expect(projectSettings.disallowedTools).toEqual(["DeleteFile"]);
+    expect(projectSettings.mcpServers?.docs).toEqual({
+      url: "http://127.0.0.1:4222/sse",
+      enabled: false
+    });
+
+    const antigravityConfig = JSON.parse(
+      await readFile(path.join(configHomeDir, ".gemini", "antigravity", "mcp_config.json"), "utf8")
+    ) as {
+      mcpServers?: Record<string, { command?: string; enabled?: boolean }>;
+    };
+    expect(antigravityConfig.mcpServers?.workspace).toEqual({
+      command: "gemini-workspace-mcp",
+      enabled: true
+    });
+  });
 });
 
 async function registerAndAuthenticate(app: FastifyInstance): Promise<{ authorization: string }> {
@@ -393,11 +477,27 @@ async function seedSettingsFixtures(homeDir: string, workspaceRoot: string): Pro
   );
 
   await mkdir(path.join(homeDir, ".gemini"), { recursive: true });
+  await mkdir(path.join(homeDir, ".gemini", "antigravity"), { recursive: true });
   await writeFile(
     path.join(homeDir, ".gemini", "settings.json"),
     JSON.stringify(
       {
         model: "gemini-2.5-pro",
+        mcpServers: {
+          workspace: {
+            command: "gemini-workspace-mcp"
+          }
+        }
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  await writeFile(
+    path.join(homeDir, ".gemini", "antigravity", "mcp_config.json"),
+    JSON.stringify(
+      {
         mcpServers: {
           workspace: {
             command: "gemini-workspace-mcp"

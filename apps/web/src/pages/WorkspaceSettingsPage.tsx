@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<ProviderSettingsRecord["status"], string> = {
   not_found: "未发现"
 };
 
-const EDITABLE_PROVIDERS = new Set<ProviderSettingsRecord["provider"]>(["claude", "codex"]);
+const EDITABLE_PROVIDERS = new Set<ProviderSettingsRecord["provider"]>(["claude", "codex", "gemini"]);
 
 interface EditableMcpServerInput {
   id: string;
@@ -57,8 +57,8 @@ export function ProjectSettingsOverview({
   loading: boolean;
   error: string | null;
   fallbackRootPath: string;
-  onSaveProvider(provider: "claude" | "codex", input: Omit<ProjectSettingsUpdateInput, "provider">): Promise<void>;
-  savingProvider: "claude" | "codex" | null;
+  onSaveProvider(provider: "claude" | "codex" | "gemini", input: Omit<ProjectSettingsUpdateInput, "provider">): Promise<void>;
+  savingProvider: "claude" | "codex" | "gemini" | null;
   saveNotice: string | null;
 }): JSX.Element {
   return (
@@ -70,7 +70,7 @@ export function ProjectSettingsOverview({
             <h3>CLI 兼容层控制面板</h3>
             <p className="muted">{settings?.projectRootPath ?? fallbackRootPath}</p>
           </div>
-          <div className="settings-hero-note">Claude / Codex 已支持写回本地配置，Cursor / Gemini 暂时保持只读。</div>
+          <div className="settings-hero-note">Claude / Codex / Gemini 已支持写回本地配置，Cursor 继续保持只读。</div>
         </div>
 
         {loading ? <p className="muted">正在读取本地 CLI 配置摘要...</p> : null}
@@ -107,7 +107,7 @@ export function WorkspaceSettingsPage(): JSX.Element {
   const [settings, setSettings] = useState<ProjectSettingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingProvider, setSavingProvider] = useState<"claude" | "codex" | null>(null);
+  const [savingProvider, setSavingProvider] = useState<"claude" | "codex" | "gemini" | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -145,7 +145,7 @@ export function WorkspaceSettingsPage(): JSX.Element {
   }, [projectId, token]);
 
   async function handleSaveProvider(
-    provider: "claude" | "codex",
+    provider: "claude" | "codex" | "gemini",
     input: Omit<ProjectSettingsUpdateInput, "provider">
   ): Promise<void> {
     if (!token || !projectId) {
@@ -186,7 +186,7 @@ function ProviderSettingsCard({
 }: {
   provider: ProviderSettingsRecord;
   saving: boolean;
-  onSave(provider: "claude" | "codex", input: Omit<ProjectSettingsUpdateInput, "provider">): Promise<void>;
+  onSave(provider: "claude" | "codex" | "gemini", input: Omit<ProjectSettingsUpdateInput, "provider">): Promise<void>;
 }): JSX.Element {
   const editable = EDITABLE_PROVIDERS.has(provider.provider);
   const [formState, setFormState] = useState<EditableProviderFormState>(() =>
@@ -267,7 +267,7 @@ function ProviderSettingsCard({
               />
             </label>
 
-            {provider.provider === "codex" ? (
+            {provider.provider === "codex" || provider.provider === "gemini" ? (
               <div className="settings-inline-grid">
                 <label>
                   Approval Policy
@@ -300,7 +300,7 @@ function ProviderSettingsCard({
               </div>
             ) : null}
 
-            {provider.provider === "claude" ? (
+            {provider.provider === "claude" || provider.provider === "gemini" ? (
               <div className="settings-inline-grid">
                 <label>
                   允许工具
@@ -436,7 +436,13 @@ function ProviderSettingsCard({
 
           <div className="settings-card-actions">
             <span className="muted">
-              当前会写回 {provider.provider === "claude" ? "Claude settings / .mcp.json" : "Codex config.toml"}。
+              当前会写回{" "}
+              {provider.provider === "claude"
+                ? "Claude settings / .mcp.json"
+                : provider.provider === "codex"
+                  ? "Codex config.toml"
+                  : "Gemini settings / antigravity mcp_config.json"}
+              。
             </span>
             <button className="primary-button" disabled={!isDirty || saving} type="submit">
               {saving ? "保存中..." : "保存到本地 CLI"}
@@ -539,10 +545,22 @@ function serializeFormState(
   return {
     model: normalizeOptionalInput(state.model),
     reasoningEffort: normalizeOptionalInput(state.reasoningEffort),
-    approvalPolicy: provider.provider === "codex" ? normalizeOptionalInput(state.approvalPolicy) : undefined,
-    sandboxMode: provider.provider === "codex" ? normalizeOptionalInput(state.sandboxMode) : undefined,
-    allowedTools: provider.provider === "claude" ? splitCommaSeparatedValues(state.allowedTools) : undefined,
-    disallowedTools: provider.provider === "claude" ? splitCommaSeparatedValues(state.disallowedTools) : undefined,
+    approvalPolicy:
+      provider.provider === "codex" || provider.provider === "gemini"
+        ? normalizeOptionalInput(state.approvalPolicy)
+        : undefined,
+    sandboxMode:
+      provider.provider === "codex" || provider.provider === "gemini"
+        ? normalizeOptionalInput(state.sandboxMode)
+        : undefined,
+    allowedTools:
+      provider.provider === "claude" || provider.provider === "gemini"
+        ? splitCommaSeparatedValues(state.allowedTools)
+        : undefined,
+    disallowedTools:
+      provider.provider === "claude" || provider.provider === "gemini"
+        ? splitCommaSeparatedValues(state.disallowedTools)
+        : undefined,
     mcpServers: state.mcpServers
       .map((server) => toMcpServerRecord(provider, server))
       .filter((server): server is CliMcpServerRecord => Boolean(server))
@@ -628,6 +646,6 @@ function inferEditableTransport(
 
 function isEditableProvider(
   provider: ProviderSettingsRecord["provider"]
-): provider is "claude" | "codex" {
-  return provider === "claude" || provider === "codex";
+): provider is "claude" | "codex" | "gemini" {
+  return provider === "claude" || provider === "codex" || provider === "gemini";
 }

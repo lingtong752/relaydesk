@@ -2,6 +2,11 @@ import type { SessionRecord, MessageRecord } from "@shared";
 import { MessageComposer } from "./MessageComposer";
 import { MessageList } from "./MessageList";
 import { SectionHeader } from "../../../shared/ui/SectionHeader";
+import {
+  getSessionCapabilities,
+  getSessionOriginRuntimeLabel,
+  getSessionResumeStatusLabel
+} from "../../../lib/sessionRuntime";
 
 interface CurrentSessionPanelProps {
   combinedError: string | null;
@@ -9,6 +14,9 @@ interface CurrentSessionPanelProps {
   messages: MessageRecord[];
   selectedSession: SessionRecord | null;
   stoppingSession: boolean;
+  onOpenFiles(): void;
+  onOpenGit(): void;
+  onOpenTerminal(): void;
   onDraftChange(value: string): void;
   onStopSession(): void;
   onSubmit(event: React.FormEvent<HTMLFormElement>): void | Promise<void>;
@@ -20,40 +28,63 @@ export function CurrentSessionPanel({
   messages,
   selectedSession,
   stoppingSession,
+  onOpenFiles,
+  onOpenGit,
+  onOpenTerminal,
   onDraftChange,
   onStopSession,
   onSubmit
 }: CurrentSessionPanelProps): JSX.Element {
   const isImportedCliSession = selectedSession?.origin === "imported_cli";
-  const canContinueImportedCliSession =
-    isImportedCliSession &&
-    !!selectedSession &&
-    ["claude", "codex", "gemini"].includes(selectedSession.provider);
+  const sessionCapabilities = getSessionCapabilities(selectedSession);
+  const sessionResumeLabel = getSessionResumeStatusLabel(selectedSession);
 
   return (
     <section className="chat-panel">
       <SectionHeader
         actions={
-          <button
-            className="secondary-button"
-            disabled={
-              !selectedSession ||
-              stoppingSession ||
-              (isImportedCliSession && !canContinueImportedCliSession)
-            }
-            onClick={onStopSession}
-            type="button"
-          >
-            {stoppingSession ? "停止中..." : "停止当前输出"}
-          </button>
+          <div className="section-actions">
+            <button
+              className="secondary-button"
+              disabled={!selectedSession}
+              onClick={onOpenFiles}
+              type="button"
+            >
+              跳到文件
+            </button>
+            <button
+              className="secondary-button"
+              disabled={!selectedSession}
+              onClick={onOpenGit}
+              type="button"
+            >
+              跳到 Git
+            </button>
+            <button
+              className="secondary-button"
+              disabled={!selectedSession || !sessionCapabilities.canAttachTerminal}
+              onClick={onOpenTerminal}
+              type="button"
+            >
+              打开绑定终端
+            </button>
+            <button
+              className="secondary-button"
+              disabled={
+                !selectedSession ||
+                stoppingSession ||
+                (isImportedCliSession && !sessionCapabilities.canSendMessages)
+              }
+              onClick={onStopSession}
+              type="button"
+            >
+              {stoppingSession ? "停止中..." : "停止当前输出"}
+            </button>
+          </div>
         }
         description={
           selectedSession
-            ? isImportedCliSession
-              ? canContinueImportedCliSession
-                ? `Provider: ${selectedSession.provider} · CLI 历史会话（可继续发送）`
-                : `Provider: ${selectedSession.provider} · CLI 历史会话（只读）`
-              : `Provider: ${selectedSession.provider}`
+            ? `Provider: ${selectedSession.provider} · ${getSessionOriginRuntimeLabel(selectedSession)}`
             : undefined
         }
         eyebrow="当前会话"
@@ -61,21 +92,30 @@ export function CurrentSessionPanel({
       />
 
       {combinedError ? <div className="error-box">{combinedError}</div> : null}
-      {isImportedCliSession ? (
+      {selectedSession ? (
         <div className="info-box">
-          {canContinueImportedCliSession
-            ? "这条会话来自本机 CLI 历史记录，当前已经支持继续发送；如果你切到替身页，也可以直接叠加到真实 CLI 会话之上运行。"
-            : "这条会话来自本机 CLI 历史记录，当前支持查看上下文；这个 provider 的继续发送能力还没有接进来。"}
+          当前会话工作区：{selectedSession.sourcePath ?? "使用项目根路径"}。
+          {sessionCapabilities.canAttachTerminal
+            ? " 可以从这里直接打开绑定终端，保持同一条 session 的上下文。"
+            : " 当前还不能附着终端。"}
         </div>
       ) : null}
+      {isImportedCliSession ? (
+        <div className="info-box">
+          {sessionCapabilities.canSendMessages
+            ? "这条会话来自本机 CLI 历史记录，当前已经支持继续发送；后续会继续把它打磨成真正的一等 session 工作台。"
+            : "这条会话来自本机 CLI 历史记录，当前仍处于只读观察模式。"}
+          {sessionResumeLabel ? ` ${sessionResumeLabel}。` : ""}
+        </div>
+      ) : sessionResumeLabel ? <div className="info-box">{sessionResumeLabel}</div> : null}
 
       <MessageList messages={messages} />
       <MessageComposer
-        disabled={!selectedSession || (isImportedCliSession && !canContinueImportedCliSession)}
+        disabled={!selectedSession || !sessionCapabilities.canSendMessages}
         messageDraft={messageDraft}
         placeholder={
           isImportedCliSession
-            ? canContinueImportedCliSession
+            ? sessionCapabilities.canSendMessages
               ? "继续对这条本机 CLI 会话发送消息"
               : "这个 CLI provider 当前仍是只读，后续会接入继续发送"
             : "输入你要交给 Agent 的任务"

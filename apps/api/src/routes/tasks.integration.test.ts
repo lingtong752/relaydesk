@@ -148,6 +148,355 @@ describe("task routes integration", () => {
       })
     });
   });
+
+  it("updates TaskMaster tasks and starts runs from the task workspace", async () => {
+    await mkdir(path.join(workspaceRoot, ".taskmaster", "tasks"), { recursive: true });
+    await writeFile(
+      path.join(workspaceRoot, ".taskmaster", "tasks", "tasks.json"),
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "推进任务工作台",
+              status: "todo",
+              summary: "先把任务改成可执行面板。"
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const authHeader = await registerAndAuthenticate(app);
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "tasks-execution-demo",
+        rootPath: workspaceRoot
+      }
+    });
+    const projectId = (projectResponse.json() as { project: { id: string } }).project.id;
+
+    const sessionResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/sessions`,
+      headers: authHeader,
+      payload: {
+        title: "Task Session",
+        provider: "claude"
+      }
+    });
+    const sessionId = (sessionResponse.json() as { session: { id: string } }).session.id;
+
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${projectId}/tasks/TASK-1`,
+      headers: authHeader,
+      payload: {
+        status: "in_progress",
+        assignee: "Alice",
+        notes: "进入实现阶段。"
+      }
+    });
+
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json()).toEqual({
+      board: expect.objectContaining({
+        tasks: expect.arrayContaining([
+          expect.objectContaining({
+            id: "TASK-1",
+            status: "in_progress",
+            assignee: "Alice",
+            notes: "进入实现阶段。"
+          })
+        ])
+      }),
+      task: expect.objectContaining({
+        id: "TASK-1",
+        status: "in_progress"
+      })
+    });
+
+    const startRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/tasks/TASK-1/start-run`,
+      headers: authHeader,
+      payload: {
+        sessionId,
+        objective: "推进任务：任务工作台",
+        constraints: "保持验证链路完整"
+      }
+    });
+
+    expect(startRunResponse.statusCode).toBe(200);
+    expect(startRunResponse.json()).toEqual(
+      expect.objectContaining({
+        task: expect.objectContaining({
+          id: "TASK-1",
+          boundSessionId: sessionId,
+          boundRunId: expect.any(String),
+          timeline: expect.arrayContaining([
+            expect.objectContaining({
+              type: "run_started"
+            })
+          ])
+        }),
+        run: expect.objectContaining({
+          status: "waiting_human",
+          objective: "推进任务：任务工作台"
+        }),
+        approval: expect.objectContaining({
+          status: "pending"
+        })
+      })
+    );
+  });
+
+  it("returns a sync conflict when TaskMaster changed after the board was loaded", async () => {
+    await mkdir(path.join(workspaceRoot, ".taskmaster", "tasks"), { recursive: true });
+    const taskFilePath = path.join(workspaceRoot, ".taskmaster", "tasks", "tasks.json");
+    await writeFile(
+      taskFilePath,
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "保护 TaskMaster 同步",
+              status: "todo"
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const authHeader = await registerAndAuthenticate(app);
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "tasks-conflict-demo",
+        rootPath: workspaceRoot
+      }
+    });
+    const projectId = (projectResponse.json() as { project: { id: string } }).project.id;
+
+    const sessionResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/sessions`,
+      headers: authHeader,
+      payload: {
+        title: "Conflict Session",
+        provider: "claude"
+      }
+    });
+    const sessionId = (sessionResponse.json() as { session: { id: string } }).session.id;
+
+    const boardResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${projectId}/tasks`,
+      headers: authHeader
+    });
+    const syncToken = (
+      boardResponse.json() as { board: { taskMaster: { syncToken: string | null } } }
+    ).board.taskMaster.syncToken;
+    expect(syncToken).toEqual(expect.any(String));
+
+    await writeFile(
+      taskFilePath,
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "保护 TaskMaster 同步",
+              status: "blocked",
+              relaydesk: {
+                notes: "外部流程已经更新这个任务。"
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${projectId}/tasks/TASK-1`,
+      headers: authHeader,
+      payload: {
+        status: "in_progress",
+        expectedSyncToken: syncToken
+      }
+    });
+    expect(updateResponse.statusCode).toBe(409);
+    expect(updateResponse.json()).toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining("显式同步"),
+        board: expect.objectContaining({
+          tasks: expect.arrayContaining([
+            expect.objectContaining({
+              id: "TASK-1",
+              status: "blocked",
+              notes: "外部流程已经更新这个任务。"
+            })
+          ]),
+          taskMaster: expect.objectContaining({
+            syncToken: expect.any(String),
+            sourceUpdatedAt: expect.any(String)
+          })
+        })
+      })
+    );
+
+    const startRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/tasks/TASK-1/start-run`,
+      headers: authHeader,
+      payload: {
+        sessionId,
+        constraints: "",
+        expectedSyncToken: syncToken
+      }
+    });
+    expect(startRunResponse.statusCode).toBe(409);
+    expect(startRunResponse.json()).toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining("显式同步"),
+        board: expect.objectContaining({
+          tasks: expect.arrayContaining([
+            expect.objectContaining({
+              id: "TASK-1",
+              status: "blocked"
+            })
+          ])
+        })
+      })
+    );
+
+    const forceSaveResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${projectId}/tasks/TASK-1`,
+      headers: authHeader,
+      payload: {
+        status: "done",
+        notes: "保留当前编辑并覆盖外部更新。",
+        expectedSyncToken: syncToken,
+        forceOverwrite: true
+      }
+    });
+    expect(forceSaveResponse.statusCode).toBe(200);
+    expect(forceSaveResponse.json()).toEqual(
+      expect.objectContaining({
+        task: expect.objectContaining({
+          id: "TASK-1",
+          status: "done",
+          notes: "保留当前编辑并覆盖外部更新。"
+        })
+      })
+    );
+
+    const secondSessionResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/sessions`,
+      headers: authHeader,
+      payload: {
+        title: "Conflict Session 2",
+        provider: "claude"
+      }
+    });
+    const secondSessionId = (secondSessionResponse.json() as { session: { id: string } }).session.id;
+
+    await writeFile(
+      taskFilePath,
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "保护 TaskMaster 同步",
+              status: "blocked",
+              relaydesk: {
+                notes: "再次发生了外部更新。"
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const refreshedBoardResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${projectId}/tasks`,
+      headers: authHeader
+    });
+    const staleSyncToken = (
+      refreshedBoardResponse.json() as { board: { taskMaster: { syncToken: string | null } } }
+    ).board.taskMaster.syncToken;
+    expect(staleSyncToken).toEqual(expect.any(String));
+
+    await writeFile(
+      taskFilePath,
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "保护 TaskMaster 同步",
+              status: "blocked",
+              relaydesk: {
+                notes: "外部更新之后准备再次启动 run。"
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const forceRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/tasks/TASK-1/start-run`,
+      headers: authHeader,
+      payload: {
+        sessionId: secondSessionId,
+        objective: "推进任务：冲突覆盖运行",
+        constraints: "",
+        expectedSyncToken: staleSyncToken,
+        forceOverwrite: true
+      }
+    });
+    expect(forceRunResponse.statusCode).toBe(200);
+    expect(forceRunResponse.json()).toEqual(
+      expect.objectContaining({
+        task: expect.objectContaining({
+          id: "TASK-1",
+          boundSessionId: secondSessionId,
+          boundRunId: expect.any(String)
+        }),
+        run: expect.objectContaining({
+          objective: "推进任务：冲突覆盖运行"
+        })
+      })
+    );
+  });
 });
 
 async function registerAndAuthenticate(app: FastifyInstance): Promise<{ authorization: string }> {

@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { WorkspaceFileContent, WorkspaceFileEntry } from "@shared";
+import type { SessionRecord, WorkspaceFileContent, WorkspaceFileEntry } from "@shared";
 import { api } from "../../../../lib/api";
+import {
+  getSessionOriginRuntimeLabel,
+  getSessionResumeStatusLabel,
+  getSessionStatusLabel
+} from "../../../../lib/sessionRuntime";
 import { EmptyState } from "../../../../shared/ui/EmptyState";
 import { SectionHeader } from "../../../../shared/ui/SectionHeader";
 import { CodeEditor } from "./CodeEditor";
 
 interface FileWorkspaceProps {
+  boundSession?: SessionRecord | null;
+  onOpenBoundSession?(): void;
   projectId: string;
   rootPath: string;
   token: string;
@@ -53,7 +60,13 @@ function confirmAction(message: string): boolean {
   return window.confirm(message);
 }
 
-export function FileWorkspace({ projectId, rootPath, token }: FileWorkspaceProps): JSX.Element {
+export function FileWorkspace({
+  boundSession = null,
+  onOpenBoundSession,
+  projectId,
+  rootPath,
+  token
+}: FileWorkspaceProps): JSX.Element {
   const [entriesByPath, setEntriesByPath] = useState<Record<string, WorkspaceFileEntry[]>>({});
   const [expandedPaths, setExpandedPaths] = useState<string[]>([]);
   const [loadingPaths, setLoadingPaths] = useState<string[]>([]);
@@ -74,6 +87,10 @@ export function FileWorkspace({ projectId, rootPath, token }: FileWorkspaceProps
   const dirtyTabs = useMemo(
     () => openTabs.filter((tab) => isTabDirty(tab)),
     [openTabs]
+  );
+  const boundSessionResumeLabel = useMemo(
+    () => getSessionResumeStatusLabel(boundSession),
+    [boundSession]
   );
   const searchQuery = fileSearchQuery.trim();
   const shouldShowSearchResults = searchQuery.length >= FILE_SEARCH_MIN_LENGTH;
@@ -389,6 +406,21 @@ export function FileWorkspace({ projectId, rootPath, token }: FileWorkspaceProps
       />
 
       {error ? <div className="error-box">{error}</div> : null}
+      {boundSession ? (
+        <div className="info-box">
+          当前从会话“{boundSession.title}”进入文件工作台。
+          {` ${boundSession.provider} · ${getSessionOriginRuntimeLabel(boundSession)} · 状态 ${getSessionStatusLabel(boundSession)}。`}
+          {boundSessionResumeLabel ? ` ${boundSessionResumeLabel}。` : ""}
+          {onOpenBoundSession ? (
+            <>
+              {" "}
+              <button className="secondary-button compact" onClick={onOpenBoundSession} type="button">
+                回到当前会话
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="files-layout">
         <div className="file-tree-panel">

@@ -105,6 +105,64 @@ async function finalizeAbortedRun(
   return collections.runs.findOne({ _id: run._id });
 }
 
+async function markImportedSessionResumeAttempt(input: {
+  collections: DatabaseCollections;
+  sessionId: ObjectId;
+  attemptAt: Date;
+}): Promise<void> {
+  await input.collections.sessions.updateOne(
+    { _id: input.sessionId },
+    {
+      $set: {
+        lastResumeAttemptAt: input.attemptAt,
+        lastResumeError: null
+      }
+    }
+  );
+}
+
+async function markImportedSessionResumeResult(input: {
+  collections: DatabaseCollections;
+  sessionId: ObjectId;
+  attemptAt: Date;
+  updatedAt: Date;
+  status?: SessionDoc["status"];
+  result: "succeeded" | "failed" | "aborted";
+  errorMessage?: string | null;
+  externalSessionId?: string;
+  touchLastMessageAt?: boolean;
+}): Promise<void> {
+  const nextValues: Partial<SessionDoc> = {
+    updatedAt: input.updatedAt,
+    lastResumeAttemptAt: input.attemptAt,
+    lastResumeStatus: input.result,
+    lastResumeError: input.result === "failed" ? input.errorMessage ?? "恢复失败" : null
+  };
+
+  if (input.status) {
+    nextValues.status = input.status;
+  }
+
+  if (input.result === "succeeded") {
+    nextValues.lastResumedAt = input.updatedAt;
+  }
+
+  if (input.externalSessionId) {
+    nextValues.externalSessionId = input.externalSessionId;
+  }
+
+  if (input.touchLastMessageAt) {
+    nextValues.lastMessageAt = input.updatedAt;
+  }
+
+  await input.collections.sessions.updateOne(
+    { _id: input.sessionId },
+    {
+      $set: nextValues
+    }
+  );
+}
+
 export async function streamProviderMessage(input: {
   collections: DatabaseCollections;
   hub: SessionHub;
@@ -253,6 +311,13 @@ export async function streamImportedCliSessionMessage(input: {
   });
 
   const controller = registry.startSession(session._id!.toHexString());
+  const attemptAt = new Date();
+
+  await markImportedSessionResumeAttempt({
+    collections,
+    sessionId: session._id!,
+    attemptAt
+  });
 
   try {
     const result = await cliSessionRunner.resumeSession({
@@ -274,17 +339,16 @@ export async function streamImportedCliSessionMessage(input: {
         }
       }
     );
-    await collections.sessions.updateOne(
-      { _id: session._id },
-      {
-        $set: {
-          status: "idle",
-          updatedAt,
-          lastMessageAt: updatedAt,
-          ...(result.externalSessionId ? { externalSessionId: result.externalSessionId } : {})
-        }
-      }
-    );
+    await markImportedSessionResumeResult({
+      collections,
+      sessionId: session._id!,
+      attemptAt,
+      updatedAt,
+      status: "idle",
+      result: "succeeded",
+      externalSessionId: result.externalSessionId,
+      touchLastMessageAt: true
+    });
 
     const completedMessage = await collections.messages.findOne({ _id: providerMessage._id });
     if (completedMessage) {
@@ -312,15 +376,15 @@ export async function streamImportedCliSessionMessage(input: {
         }
       }
     );
-    await collections.sessions.updateOne(
-      { _id: session._id },
-      {
-        $set: {
-          status: "stopped",
-          updatedAt
-        }
-      }
-    );
+    await markImportedSessionResumeResult({
+      collections,
+      sessionId: session._id!,
+      attemptAt,
+      updatedAt,
+      status: "stopped",
+      result: isAborted ? "aborted" : "failed",
+      errorMessage: isAborted ? null : message
+    });
 
     const failedMessage = await collections.messages.findOne({ _id: providerMessage._id });
     if (failedMessage) {
@@ -406,6 +470,13 @@ export async function streamSurrogateRun(input: {
         throw new ProviderRuntimeError("Project not found for current run.");
       }
 
+      const attemptAt = new Date();
+      await markImportedSessionResumeAttempt({
+        collections,
+        sessionId: session._id!,
+        attemptAt
+      });
+
       const result = await cliSessionRunner.resumeSession({
         provider: session.provider,
         cwd: project.rootPath,
@@ -416,17 +487,14 @@ export async function streamSurrogateRun(input: {
 
       replyText = result.text;
 
-      if (result.externalSessionId && result.externalSessionId !== session.externalSessionId) {
-        await collections.sessions.updateOne(
-          { _id: session._id },
-          {
-            $set: {
-              externalSessionId: result.externalSessionId,
-              updatedAt: new Date()
-            }
-          }
-        );
-      }
+      await markImportedSessionResumeResult({
+        collections,
+        sessionId: session._id!,
+        attemptAt,
+        updatedAt: new Date(),
+        result: "succeeded",
+        externalSessionId: result.externalSessionId
+      });
     } else {
       replyText = await generateProviderReply({
         provider: run.provider,
@@ -477,6 +545,19 @@ export async function streamSurrogateRun(input: {
         createdAt: updatedAt
       });
     }
+
+    const session = await collections.sessions.findOne({ _id: run.sessionId });
+    if (session?.origin === "imported_cli") {
+      await markImportedSessionResumeResult({
+        collections,
+        sessionId: run.sessionId,
+        attemptAt: session.lastResumeAttemptAt ?? updatedAt,
+        updatedAt,
+        result: isAborted ? "aborted" : "failed",
+        errorMessage: isAborted ? null : message
+      });
+    }
+
     if (failedRun) {
       hub.publish(channelProject, {
         type: "run.updated",

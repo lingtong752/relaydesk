@@ -5,7 +5,9 @@ import type {
   AuthUser,
   MessageRecord,
   PluginActionRecord,
+  PluginExecutionHistoryRecord,
   PluginInstallationRecord,
+  PluginRpcMethodRecord,
   ProjectRecord,
   RunCheckpointRecord,
   RunRecord,
@@ -37,7 +39,12 @@ export interface SessionDoc {
   origin: SessionRecord["origin"];
   externalSessionId?: string;
   sourcePath?: string;
+  runtimeMode?: SessionRecord["runtimeMode"];
   status: SessionRecord["status"];
+  lastResumeAttemptAt?: Date;
+  lastResumedAt?: Date;
+  lastResumeStatus?: SessionRecord["lastResumeStatus"];
+  lastResumeError?: string | null;
   createdAt: Date;
   updatedAt: Date;
   lastMessageAt?: Date;
@@ -113,18 +120,36 @@ export interface PluginInstallationDoc {
   pluginId: string;
   sourceType: PluginInstallationRecord["sourceType"];
   sourceRef?: string | null;
+  sourceVersion?: string | null;
   name: string;
   version: string;
   description: string;
   capabilities: string[];
   tabTitle: string;
   routeSegment: string;
+  frontend: PluginInstallationRecord["frontend"];
   frontendComponent: PluginInstallationRecord["frontendComponent"];
   backendService: PluginInstallationRecord["backendService"];
   actions: PluginActionRecord[];
+  rpcMethods: PluginRpcMethodRecord[];
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PluginExecutionHistoryDoc {
+  _id?: ObjectId;
+  projectId: ObjectId;
+  pluginId: string;
+  executionKind: PluginExecutionHistoryRecord["executionKind"];
+  title: string;
+  summary: string;
+  success: boolean;
+  durationMs: number;
+  executedAt: Date;
+  actionId?: string;
+  rpcMethodId?: string;
+  details?: Record<string, unknown>;
 }
 
 export interface DatabaseCollections {
@@ -137,6 +162,7 @@ export interface DatabaseCollections {
   auditEvents: Collection<AuditEventDoc>;
   runCheckpoints: Collection<RunCheckpointDoc>;
   pluginInstallations: Collection<PluginInstallationDoc>;
+  pluginExecutionHistory: Collection<PluginExecutionHistoryDoc>;
 }
 
 export interface Database {
@@ -158,7 +184,8 @@ export async function connectDatabase(uri: string, dbName: string): Promise<Data
     approvals: db.collection<ApprovalDoc>("approvals"),
     auditEvents: db.collection<AuditEventDoc>("audit_events"),
     runCheckpoints: db.collection<RunCheckpointDoc>("run_checkpoints"),
-    pluginInstallations: db.collection<PluginInstallationDoc>("plugin_installations")
+    pluginInstallations: db.collection<PluginInstallationDoc>("plugin_installations"),
+    pluginExecutionHistory: db.collection<PluginExecutionHistoryDoc>("plugin_execution_history")
   };
 
   await collections.users.createIndex({ email: 1 }, { unique: true });
@@ -173,6 +200,7 @@ export async function connectDatabase(uri: string, dbName: string): Promise<Data
   await collections.runCheckpoints.createIndex({ runId: 1, createdAt: -1 });
   await collections.runCheckpoints.createIndex({ projectId: 1, createdAt: -1 });
   await collections.pluginInstallations.createIndex({ projectId: 1, pluginId: 1 }, { unique: true });
+  await collections.pluginExecutionHistory.createIndex({ projectId: 1, pluginId: 1, executedAt: -1 });
 
   return { client, collections };
 }
@@ -214,7 +242,12 @@ export function serializeSession(doc: SessionDoc): SessionRecord {
     origin: doc.origin,
     externalSessionId: doc.externalSessionId,
     sourcePath: doc.sourcePath,
+    runtimeMode: doc.runtimeMode,
     status: doc.status,
+    lastResumeAttemptAt: doc.lastResumeAttemptAt?.toISOString(),
+    lastResumedAt: doc.lastResumedAt?.toISOString(),
+    lastResumeStatus: doc.lastResumeStatus,
+    lastResumeError: doc.lastResumeError ?? null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
     lastMessageAt: doc.lastMessageAt?.toISOString()
@@ -304,17 +337,44 @@ export function serializePluginInstallation(
     id: doc.pluginId,
     sourceType: doc.sourceType,
     sourceRef: doc.sourceRef,
+    sourceVersion: doc.sourceVersion ?? null,
     name: doc.name,
     version: doc.version,
     description: doc.description,
     capabilities: doc.capabilities,
     tabTitle: doc.tabTitle,
     routeSegment: doc.routeSegment,
+    frontend: doc.frontend ?? {
+      type: "builtin",
+      apiVersion: "1.0",
+      displayName: doc.name,
+      builtinComponent: doc.frontendComponent,
+      entry: null
+    },
     frontendComponent: doc.frontendComponent,
     backendService: doc.backendService,
     actions: doc.actions ?? [],
+    rpcMethods: doc.rpcMethods ?? [],
     enabled: doc.enabled,
     installedAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString()
+  };
+}
+
+export function serializePluginExecutionHistory(
+  doc: PluginExecutionHistoryDoc
+): PluginExecutionHistoryRecord {
+  return {
+    id: doc._id!.toHexString(),
+    pluginId: doc.pluginId,
+    executionKind: doc.executionKind,
+    title: doc.title,
+    summary: doc.summary,
+    success: doc.success,
+    durationMs: doc.durationMs,
+    executedAt: doc.executedAt.toISOString(),
+    actionId: doc.actionId,
+    rpcMethodId: doc.rpcMethodId,
+    details: doc.details
   };
 }

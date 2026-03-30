@@ -1,7 +1,7 @@
 import type { MessageDoc } from "../../../db.js";
 import { env } from "../../../env.js";
 import { ProviderRuntimeError } from "../errors.js";
-import { normalizeContent } from "../shared.js";
+import { buildProviderCliBridgeSupport, buildShellTerminalSupport, normalizeContent } from "../shared.js";
 import type { ProviderAdapter, ProviderMode } from "../types.js";
 
 interface GeminiTextPart {
@@ -94,6 +94,13 @@ export function buildGeminiContents(history: MessageDoc[], prompt?: string): Gem
 
 export const geminiProviderAdapter: ProviderAdapter = {
   id: "gemini",
+  getTerminalSupport(input) {
+    if (input.runtimeMode === "cli_session_mode") {
+      return buildProviderCliBridgeSupport();
+    }
+
+    return buildShellTerminalSupport("当前 Gemini 会话不是 CLI 历史会话，先回退到项目 shell。");
+  },
   async generateReply(input) {
     if (!env.GEMINI_API_KEY) {
       throw new ProviderRuntimeError("Gemini provider is not configured. Please set GEMINI_API_KEY.");

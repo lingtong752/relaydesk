@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { ObjectId } from "mongodb";
 import { createApp } from "../app.js";
 import type { TerminalSessionRecord } from "@shared";
 import { createInMemoryDatabase } from "../testUtils/inMemoryDatabase.js";
@@ -15,6 +16,13 @@ type TerminalEvent =
           projectId: string;
           cwd: string;
           shell: string;
+          backendType: TerminalSessionRecord["backendType"];
+          provider?: TerminalSessionRecord["provider"];
+          attachMode?: TerminalSessionRecord["attachMode"];
+          supportsInput: boolean;
+          supportsResize: boolean;
+          fallbackReason?: string | null;
+          sourceSession?: TerminalSessionRecord["sourceSession"];
           createdAt: string;
         };
       };
@@ -58,6 +66,13 @@ class FakeTerminalManager extends TerminalManager {
     ownerId: string;
     projectId: string;
     cwd: string;
+    sourceSession?: TerminalSessionRecord["sourceSession"];
+    backend?: Partial<
+      Pick<
+        TerminalSessionRecord,
+        "backendType" | "provider" | "attachMode" | "supportsInput" | "supportsResize" | "fallbackReason"
+      >
+    >;
   }): Promise<TerminalSessionRecord> {
     const session: FakeTerminalSession = {
       ownerId: input.ownerId,
@@ -66,6 +81,13 @@ class FakeTerminalManager extends TerminalManager {
         projectId: input.projectId,
         cwd: input.cwd,
         shell: "/bin/fake-sh",
+        backendType: input.backend?.backendType ?? "shell",
+        provider: input.backend?.provider,
+        attachMode: input.backend?.attachMode ?? "direct_shell",
+        supportsInput: input.backend?.supportsInput ?? true,
+        supportsResize: input.backend?.supportsResize ?? true,
+        fallbackReason: input.backend?.fallbackReason ?? null,
+        sourceSession: input.sourceSession,
         createdAt: new Date().toISOString()
       },
       backlog: "",
@@ -130,6 +152,21 @@ class FakeTerminalManager extends TerminalManager {
     return Array.from(this.fakeSessions.values())
       .filter((session) => session.record.projectId === projectId && session.ownerId === ownerId)
       .map((session) => session.record);
+  }
+
+  override findSessionBySourceSession(
+    projectId: string,
+    ownerId: string,
+    sourceSessionId: string
+  ): TerminalSessionRecord | null {
+    const session = Array.from(this.fakeSessions.values()).find(
+      (entry) =>
+        entry.record.projectId === projectId &&
+        entry.ownerId === ownerId &&
+        entry.record.sourceSession?.id === sourceSessionId
+    );
+
+    return session?.record ?? null;
   }
 
   override closeSession(sessionId: string, ownerId: string): void {
@@ -305,5 +342,147 @@ describe("terminal websocket integration", () => {
     expect(listAfterCloseResponse.json()).toEqual({ sessions: [] });
 
     ws2.terminate();
+  });
+
+  it("reuses an attached terminal for the same workspace session", async () => {
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        name: "Terminal Attachment",
+        rootPath: "/tmp/relaydesk-terminal-attachment",
+        providerPreferences: ["codex"]
+      }
+    });
+    const projectId = (projectResponse.json() as { project: { id: string } }).project.id;
+
+    const workspaceSessionResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/sessions`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        title: "会话 1",
+        provider: "codex"
+      }
+    });
+    const workspaceSessionId = (
+      workspaceSessionResponse.json() as { session: { id: string } }
+    ).session.id;
+
+    const firstTerminalResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/terminal/session`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        sourceSessionId: workspaceSessionId
+      }
+    });
+    expect(firstTerminalResponse.statusCode).toBe(200);
+    const firstTerminal = firstTerminalResponse.json() as {
+      session: TerminalSessionRecord;
+    };
+    sessionId = firstTerminal.session.id;
+
+    expect(firstTerminal.session.sourceSession).toMatchObject({
+      id: workspaceSessionId,
+      title: "会话 1",
+      provider: "codex",
+      origin: "relaydesk",
+      runtimeMode: "api_mode"
+    });
+    expect(firstTerminal.session).toMatchObject({
+      backendType: "shell",
+      provider: "codex",
+      attachMode: "direct_shell",
+      supportsInput: true,
+      supportsResize: true
+    });
+
+    const secondTerminalResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/terminal/session`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        sourceSessionId: workspaceSessionId
+      }
+    });
+    expect(secondTerminalResponse.statusCode).toBe(200);
+    expect((secondTerminalResponse.json() as { session: { id: string } }).session.id).toBe(
+      firstTerminal.session.id
+    );
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${projectId}/terminal/sessions`,
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual({
+      sessions: [
+        expect.objectContaining({
+          id: firstTerminal.session.id,
+          backendType: "shell",
+          sourceSession: expect.objectContaining({
+            id: workspaceSessionId,
+            provider: "codex"
+          })
+        })
+      ]
+    });
+  });
+
+  it("creates provider-cli terminal sessions for imported CLI sessions", async () => {
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        name: "Imported Terminal Integration",
+        rootPath: "/tmp/relaydesk-imported-terminal-integration",
+        providerPreferences: ["claude"]
+      }
+    });
+    const project = projectResponse.json() as { project: { id: string } };
+    const projectObjectId = new ObjectId(project.project.id);
+    const importedSessionId = new ObjectId();
+
+    await app.db.collections.sessions.insertOne({
+      _id: importedSessionId,
+      projectId: projectObjectId,
+      provider: "claude",
+      title: "Imported Claude CLI",
+      origin: "imported_cli",
+      runtimeMode: "cli_session_mode",
+      status: "idle",
+      createdAt: new Date("2026-03-29T09:00:00.000Z"),
+      updatedAt: new Date("2026-03-29T09:00:00.000Z")
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.project.id}/terminal/session`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        sourceSessionId: importedSessionId.toHexString()
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      session: expect.objectContaining({
+        backendType: "provider_cli",
+        provider: "claude",
+        attachMode: "resume_bridge",
+        supportsInput: true,
+        supportsResize: true,
+        fallbackReason: null,
+        sourceSession: expect.objectContaining({
+          id: importedSessionId.toHexString(),
+          runtimeMode: "cli_session_mode",
+          provider: "claude"
+        })
+      })
+    });
   });
 });

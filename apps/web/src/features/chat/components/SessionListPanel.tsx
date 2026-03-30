@@ -1,6 +1,11 @@
 import type { SessionRecord } from "@shared";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import { SectionHeader } from "../../../shared/ui/SectionHeader";
+import {
+  getSessionCapabilities,
+  getSessionOriginRuntimeLabel,
+  getSessionResumeStatusLabel
+} from "../../../lib/sessionRuntime";
 
 interface SessionListPanelProps {
   creatingSession: boolean;
@@ -23,16 +28,6 @@ export function SessionListPanel({
   onProviderChange,
   onSelectSession
 }: SessionListPanelProps): JSX.Element {
-  function getImportedCliLabel(session: SessionRecord): string {
-    if (session.origin !== "imported_cli") {
-      return "";
-    }
-
-    return ["claude", "codex", "gemini"].includes(session.provider)
-      ? "CLI 历史会话 · 可继续发送"
-      : "CLI 历史会话 · 只读";
-  }
-
   return (
     <section className="panel">
       <SectionHeader
@@ -61,20 +56,26 @@ export function SessionListPanel({
 
       <div className="session-list">
         {sessions.length === 0 ? <EmptyState message="还没有会话，先新建一个。" /> : null}
-        {sessions.map((session) => (
-          <button
-            className={session.id === selectedSessionId ? "session-item active" : "session-item"}
-            key={session.id}
-            onClick={() => onSelectSession(session.id)}
-            type="button"
-          >
-            <strong>{session.title}</strong>
-            <span>{session.provider}</span>
-            {session.origin === "imported_cli" ? (
-              <span className="session-item-meta">{getImportedCliLabel(session)}</span>
-            ) : null}
-          </button>
-        ))}
+        {sessions.map((session) => {
+          const capabilities = getSessionCapabilities(session);
+          const resumeLabel = getSessionResumeStatusLabel(session);
+
+          return (
+            <button
+              className={session.id === selectedSessionId ? "session-item active" : "session-item"}
+              key={session.id}
+              onClick={() => onSelectSession(session.id)}
+              type="button"
+            >
+              <strong>{session.title}</strong>
+              <span>{session.provider}</span>
+              <span className="session-item-meta">
+                {getSessionOriginRuntimeLabel(session)} · {capabilities.canSendMessages ? "可继续发送" : "只读"}
+              </span>
+              {resumeLabel ? <span className="session-item-meta">{resumeLabel}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
