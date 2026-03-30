@@ -126,6 +126,7 @@
 - `audit_events`
 - `run_checkpoints`
 - `plugin_installations`
+- `plugin_execution_history`
 
 尚未落地：
 
@@ -162,6 +163,12 @@
 
 - 记录项目终端连接状态、启动目录和保活信息
 
+当前实现补充：
+
+- 当前仍以内存态为主，未落 MongoDB
+- 终端记录已经具备 `backendType / provider / attachMode / supportsInput / supportsResize / fallbackReason`
+- `provider_cli` 当前处于 `resume_bridge` 形态，尚未实现 provider live TTY attach
+
 ### `plugin_installations`
 
 用途：
@@ -172,6 +179,19 @@
 
 - 当前已作为 MongoDB 集合落地
 - 插件动作声明也会随安装记录一起存储，供插件运行时消费
+- 插件安装记录当前会同时保存安装源类型、来源引用、来源版本与 RPC 方法声明
+- 插件安装记录当前也会保存结构化 `frontend` 定义，用于 `builtin / local_bundle / git_bundle` runtime 挂载
+
+### `plugin_execution_history`
+
+用途：
+
+- 记录插件动作与 RPC 调用历史，供插件工作台和审计面板回放
+
+当前实现补充：
+
+- 当前已作为 MongoDB 集合落地
+- 每条记录包含执行类型、标题、摘要、成功状态、耗时和结构化细节
 
 ### `tasks`
 
@@ -182,6 +202,7 @@
 当前实现补充：
 
 - 当前任务工作台优先从文件系统聚合 TaskMaster 任务与项目文档引用
+- TaskMaster 任务当前会额外承接 `relaydesk` 命名空间元数据，用于保存备注、阻塞原因、绑定的 session/run 和时间线
 - 任务实体尚未作为 MongoDB 持久化集合落地
 
 ### `run_checkpoints`

@@ -25,6 +25,7 @@
 - 测试报告：[testing/TEST_REPORT-2026-03-28.md](./testing/TEST_REPORT-2026-03-28.md)
 - 路线图：[project-management/ROADMAP.zh-CN.md](./project-management/ROADMAP.zh-CN.md)
 - 开发待办：[project-management/BACKLOG.zh-CN.md](./project-management/BACKLOG.zh-CN.md)
+- CLI session 与插件平台计划：[project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md](./project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md)
 - 架构总览：[architecture/ARCHITECTURE_OVERVIEW.zh-CN.md](./architecture/ARCHITECTURE_OVERVIEW.zh-CN.md)
 - API 规范：[architecture/API_SPEC.zh-CN.md](./architecture/API_SPEC.zh-CN.md)
 - 数据模型：[architecture/DATA_MODEL.zh-CN.md](./architecture/DATA_MODEL.zh-CN.md)

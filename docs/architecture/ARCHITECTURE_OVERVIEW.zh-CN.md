@@ -39,9 +39,9 @@ RelayDesk 采用前后端分离的模块化单体结构：
 
 - Provider 当前已稳定接入 `mock`、`claude`、`codex`、`gemini`，`cursor` 暂不纳入近阶段里程碑
 - `provider-core` 已完成首轮抽离，当前真实 Provider 与占位 provider 已统一走适配层
-- 本地 CLI 项目发现、历史会话恢复和 provider 原生 session 继续执行链路已落地，但 Gemini / Cursor 的配置写回仍未补齐
-- Settings、MCP 配置和工具权限同步当前已支持 Claude / Codex 写回，Gemini / Cursor 仍为只读摘要
-- 文件、终端、Git、插件和任务面板都已接入，但任务系统仍是只读骨架，插件运行时仍是受控模式
+- 本地 CLI 项目发现、历史会话恢复和 provider 原生 session 继续执行链路已落地，Gemini 配置写回已补齐，`cursor` 仍未进入本轮范围
+- Settings、MCP 配置和工具权限同步当前已支持 Claude / Codex / Gemini 写回，`cursor` 仍为只读摘要
+- 文件、终端、Git、插件和任务面板都已接入；插件平台已支持 local / git 安装源、后端 RPC 和执行历史，任务面板已支持显式写回 TaskMaster 与从任务发起运行
 - 运行检查点与审计事件已落地，并支持从检查点恢复到待审批状态
 
 ## 5. 后续架构方向
