@@ -1,8 +1,6 @@
-import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
-import type { DiscoveredProjectRecord, ProjectRecord } from "@shared";
 import { getAuthUser } from "../auth.js";
 import { serializeApproval, serializeAuditEvent, serializeProject, serializeRun } from "../db.js";
 import { discoverLocalProjects } from "../services/projectDiscovery.js";
@@ -14,56 +12,18 @@ import {
   normalizeRequestedProjectRootPath,
   resolveProjectRootPath
 } from "../services/projectRoot.js";
+import {
+  buildSessionCapabilitiesMap,
+  linkDiscoveredProjects,
+  resolveActiveSessionId
+} from "../services/projectRouteState.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
-
-function resolveActiveSessionId(input: {
-  sessions: Array<{ id: string; status: string }>;
-  activeRunSessionId: string | null;
-}): string | null {
-  if (input.activeRunSessionId && input.sessions.some((session) => session.id === input.activeRunSessionId)) {
-    return input.activeRunSessionId;
-  }
-
-  const reconnectingSession = input.sessions.find((session) => session.status === "reconnecting");
-  if (reconnectingSession) {
-    return reconnectingSession.id;
-  }
-
-  const runningSession = input.sessions.find((session) => session.status === "running");
-  if (runningSession) {
-    return runningSession.id;
-  }
-
-  return input.sessions[0]?.id ?? null;
-}
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(1),
   rootPath: z.string().trim().optional(),
   providerPreferences: z.array(z.enum(["mock", "claude", "codex", "cursor", "gemini"])).optional()
 });
-
-function normalizeComparablePath(rootPath: string): string {
-  return path.resolve(rootPath.trim());
-}
-
-function linkDiscoveredProjects(
-  discoveredProjects: DiscoveredProjectRecord[],
-  projects: ProjectRecord[]
-): DiscoveredProjectRecord[] {
-  const projectIndex = new Map(
-    projects.map((project) => [normalizeComparablePath(project.rootPath), project] as const)
-  );
-
-  return discoveredProjects.map((project) => {
-    const linkedProject = projectIndex.get(normalizeComparablePath(project.rootPath));
-    return {
-      ...project,
-      linkedProjectId: linkedProject?.id ?? null,
-      linkedProjectName: linkedProject?.name ?? null
-    };
-  });
-}
 
 export async function registerProjectRoutes(
   app: FastifyInstance,
@@ -203,17 +163,7 @@ export async function registerProjectRoutes(
         sessions: workspaceSessions,
         activeRunSessionId: activeRun?.sessionId?.toHexString() ?? null
       });
-      const sessionCapabilities = Object.fromEntries(
-        workspaceSessions.map((session) => [
-          session.id,
-          session.capabilities ?? {
-            canSendMessages: false,
-            canResume: false,
-            canStartRuns: false,
-            canAttachTerminal: false
-          }
-        ])
-      );
+      const sessionCapabilities = buildSessionCapabilitiesMap(workspaceSessions);
       const recentSessionAuditEvents = activeSessionId
         ? await app.db.collections.auditEvents
             .find({

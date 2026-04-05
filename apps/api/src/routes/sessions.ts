@@ -7,6 +7,12 @@ import {
   serializeMessage,
 } from "../db.js";
 import { listImportedCliConversationMessages } from "../services/importedCliSessions.js";
+import {
+  createRelayDeskSessionDoc,
+  createUserMessageDoc,
+  getImportedSessionContinuationError,
+  resolveSessionStatusAfterUserMessage
+} from "../services/sessionDocs.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 import {
   streamImportedCliSessionMessage,
@@ -72,16 +78,12 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       }
 
       const now = new Date();
-      const doc = {
+      const doc = createRelayDeskSessionDoc({
         projectId: parsedProjectId,
         provider: parsedBody.data.provider,
         title: parsedBody.data.title,
-        origin: "relaydesk" as const,
-        runtimeMode: "api_mode" as const,
-        status: "idle" as const,
-        createdAt: now,
-        updatedAt: now
-      };
+        now
+      });
 
       const result = await app.db.collections.sessions.insertOne(doc);
       const created = await app.db.collections.sessions.findOne({ _id: result.insertedId });
@@ -163,26 +165,25 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         return reply.code(404).send({ message: "Project not found" });
       }
 
-      if (session.origin === "imported_cli") {
-        if (!app.cliSessionRunner.supportsImportedSession(session.provider)) {
-          return reply.code(409).send({
-            message: `Imported ${session.provider} sessions cannot continue via local CLI yet`
-          });
-        }
+      const importedSessionError = getImportedSessionContinuationError({
+        origin: session.origin,
+        provider: session.provider,
+        supportsImportedSession: (provider) => app.cliSessionRunner.supportsImportedSession(provider)
+      });
+      if (importedSessionError) {
+        return reply.code(409).send({
+          message: importedSessionError
+        });
       }
 
       const now = new Date();
-      const userMessage = {
-        sessionId: session._id,
+      const userMessage = createUserMessageDoc({
+        sessionId: session._id!,
         projectId: session.projectId,
-        role: "human" as const,
-        senderType: "user" as const,
         provider: session.provider,
         content: parsedBody.data.content,
-        status: "completed" as const,
-        createdAt: now,
-        updatedAt: now
-      };
+        now
+      });
 
       const inserted = await app.db.collections.messages.insertOne(userMessage);
       const created = await app.db.collections.messages.findOne({ _id: inserted.insertedId });
@@ -194,7 +195,7 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
         { _id: session._id },
         {
           $set: {
-            status: session.origin === "imported_cli" ? "reconnecting" : "running",
+            status: resolveSessionStatusAfterUserMessage(session.origin),
             updatedAt: now,
             lastMessageAt: now
           }
