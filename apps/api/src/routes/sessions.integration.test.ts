@@ -211,6 +211,38 @@ describe("session routes integration", () => {
         status: "completed"
       })
     );
+
+    const listMessagesResponse = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${sessionId}/messages`,
+      headers: authHeader
+    });
+    const listMessagesBody = listMessagesResponse.json() as {
+      messages: Array<{
+        id: string;
+        sessionId: string;
+        projectId: string;
+        role: string;
+        senderType: string;
+        content: string;
+        status: string;
+      }>;
+    };
+
+    expect(listMessagesResponse.statusCode).toBe(200);
+    expect(listMessagesBody.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.any(String),
+          sessionId,
+          projectId,
+          role: "human",
+          senderType: "user",
+          content: "请继续重构",
+          status: "completed"
+        })
+      ])
+    );
   });
 });
 

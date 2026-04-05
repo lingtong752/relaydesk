@@ -117,6 +117,16 @@ describe("project routes integration", () => {
         externalSessionId?: string;
         title: string;
       }>;
+      activeSessionId: string | null;
+      sessionCapabilities: Record<
+        string,
+        {
+          canSendMessages: boolean;
+          canResume: boolean;
+          canStartRuns: boolean;
+          canAttachTerminal: boolean;
+        }
+      >;
     };
 
     expect(bootstrapResponse.statusCode).toBe(200);
@@ -152,6 +162,23 @@ describe("project routes integration", () => {
         })
       ])
     );
+    expect(bootstrapBody.activeSessionId).toBeTruthy();
+    expect(
+      bootstrapBody.sessions.some((session) => session.id === bootstrapBody.activeSessionId)
+    ).toBe(true);
+    expect(Object.keys(bootstrapBody.sessionCapabilities).sort()).toEqual(
+      bootstrapBody.sessions.map((session) => session.id).sort()
+    );
+    for (const session of bootstrapBody.sessions) {
+      expect(bootstrapBody.sessionCapabilities[session.id]).toEqual(
+        expect.objectContaining({
+          canSendMessages: expect.any(Boolean),
+          canResume: expect.any(Boolean),
+          canStartRuns: expect.any(Boolean),
+          canAttachTerminal: expect.any(Boolean)
+        })
+      );
+    }
 
     const claudeSession = bootstrapBody.sessions.find((session) => session.provider === "claude");
     expect(claudeSession).toBeDefined();
