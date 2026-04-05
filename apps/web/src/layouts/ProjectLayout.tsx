@@ -4,6 +4,7 @@ import type { AuthUser } from "@shared";
 import type { SessionRecord } from "@shared";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
 import { getSessionOriginCreationLabel } from "../lib/sessionRuntime";
+import { buildWorkspaceToolPath } from "../features/workspace/sessionRouting";
 import {
   MAX_PINNED_SESSION_COUNT,
   MAX_RECENT_COMMAND_COUNT,
@@ -72,20 +73,17 @@ export function ProjectLayout({ user }: ProjectLayoutProps): JSX.Element {
   );
 
   function buildWorkbenchPath(tab: WorkbenchTab, sessionId = selectedSessionId): string {
-    const sessionQuery = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
     if (tab === "chat") {
-      return `/workspace/${projectId}/chat${sessionQuery}`;
+      return sessionId
+        ? `/workspace/${projectId}/chat?sessionId=${encodeURIComponent(sessionId)}`
+        : `/workspace/${projectId}/chat`;
     }
 
-    if (tab === "terminal") {
-      return `/workspace/${projectId}/tools/terminal${sessionQuery}`;
-    }
-
-    if (tab === "files") {
-      return `/workspace/${projectId}/tools/files${sessionQuery}`;
-    }
-
-    return `/workspace/${projectId}/tools/git${sessionQuery}`;
+    return buildWorkspaceToolPath({
+      projectId,
+      tool: tab,
+      sessionId
+    });
   }
 
   function openCommandPalette(scope: CommandPaletteScope = "all"): void {

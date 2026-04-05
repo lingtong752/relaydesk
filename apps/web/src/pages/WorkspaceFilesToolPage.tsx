@@ -1,13 +1,16 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { FileWorkspace } from "../features/tools/files/components/FileWorkspace";
+import {
+  buildWorkspaceChatPath,
+  findBoundSessionBySearch
+} from "../features/workspace/sessionRouting";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
 
 export function WorkspaceFilesToolPage(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
   const { projectId, projectRootPath, sessions, selectSession, token } = useProjectWorkspace();
-  const focusSourceSessionId = new URLSearchParams(location.search).get("sessionId") ?? "";
-  const boundSession = sessions.find((session) => session.id === focusSourceSessionId) ?? null;
+  const boundSession = findBoundSessionBySearch(sessions, location.search);
 
   return token ? (
     <FileWorkspace
@@ -16,7 +19,7 @@ export function WorkspaceFilesToolPage(): JSX.Element {
         boundSession
           ? () => {
               selectSession(boundSession.id);
-              navigate(`/workspace/${projectId}/chat`);
+              navigate(buildWorkspaceChatPath(projectId));
             }
           : undefined
       }

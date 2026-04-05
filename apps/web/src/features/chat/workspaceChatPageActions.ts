@@ -1,4 +1,7 @@
 import type { SessionRecord } from "@shared";
+import {
+  buildWorkspaceToolPath as buildWorkspaceToolPathFromRouting
+} from "../workspace/sessionRouting";
 
 type WorkspaceToolTab = "terminal" | "files" | "git";
 
@@ -11,8 +14,11 @@ export function buildWorkspaceToolPath(input: {
   tool: WorkspaceToolTab;
   sessionId: string;
 }): string {
-  const query = new URLSearchParams({ sessionId: input.sessionId });
-  return `/workspace/${input.projectId}/tools/${input.tool}?${query.toString()}`;
+  return buildWorkspaceToolPathFromRouting({
+    projectId: input.projectId,
+    tool: input.tool,
+    sessionId: input.sessionId
+  });
 }
 
 export function navigateToWorkspaceTool(input: {
