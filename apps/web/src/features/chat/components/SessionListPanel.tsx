@@ -7,6 +7,13 @@ import {
   getSessionOriginRuntimeLabel,
   getSessionResumeStatusLabel
 } from "../../../lib/sessionRuntime";
+import {
+  filterSessionsByKeyword,
+  getSelectedSessionActivityAt,
+  hasUnreadActivity,
+  sortSessionsForPanel,
+  type SessionPanelTab
+} from "./sessionListPanel/utils";
 
 interface SessionListPanelProps {
   creatingSession: boolean;
@@ -20,50 +27,6 @@ interface SessionListPanelProps {
   onOpenProjects(): void;
   onProviderChange(provider: SessionRecord["provider"]): void;
   onSelectSession(sessionId: string): void;
-}
-
-type SessionPanelTab = "projects" | "conversations";
-
-function getSessionActivityAt(session: SessionRecord): number {
-  const timestamp = Date.parse(session.lastMessageAt ?? session.updatedAt ?? session.createdAt);
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function getSelectedSessionActivityAt(sessions: SessionRecord[], selectedSessionId: string): number {
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId);
-  return selectedSession ? getSessionActivityAt(selectedSession) : 0;
-}
-
-function hasUnreadActivity(
-  session: SessionRecord,
-  selectedSessionId: string,
-  selectedSessionActivityAt: number
-): boolean {
-  if (session.id === selectedSessionId) {
-    return false;
-  }
-
-  return getSessionActivityAt(session) > selectedSessionActivityAt;
-}
-
-function getSessionPriority(
-  session: SessionRecord,
-  selectedSessionId: string,
-  selectedSessionActivityAt: number
-): number {
-  if (session.status === "running") {
-    return 3;
-  }
-
-  if (session.status === "reconnecting") {
-    return 2;
-  }
-
-  if (hasUnreadActivity(session, selectedSessionId, selectedSessionActivityAt)) {
-    return 1;
-  }
-
-  return 0;
 }
 
 export function SessionListPanel({
@@ -86,29 +49,10 @@ export function SessionListPanel({
     [sessions, selectedSessionId]
   );
   const sortedSessions = useMemo(
-    () =>
-      [...sessions].sort((left, right) => {
-        const priorityDiff =
-          getSessionPriority(right, selectedSessionId, selectedSessionActivityAt) -
-          getSessionPriority(left, selectedSessionId, selectedSessionActivityAt);
-        if (priorityDiff !== 0) {
-          return priorityDiff;
-        }
-
-        return getSessionActivityAt(right) - getSessionActivityAt(left);
-      }),
+    () => sortSessionsForPanel(sessions, selectedSessionId, selectedSessionActivityAt),
     [selectedSessionActivityAt, selectedSessionId, sessions]
   );
-  const filteredSessions = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    if (!normalizedKeyword) {
-      return sortedSessions;
-    }
-
-    return sortedSessions.filter((session) =>
-      `${session.title} ${session.provider} ${session.origin}`.toLowerCase().includes(normalizedKeyword)
-    );
-  }, [keyword, sortedSessions]);
+  const filteredSessions = useMemo(() => filterSessionsByKeyword(sortedSessions, keyword), [keyword, sortedSessions]);
 
   return (
     <section className="panel chat-session-panel">
