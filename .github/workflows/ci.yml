@@ -6,9 +6,12 @@ on:
       - main
       - "codex/**"
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
 
 jobs:
-  validate:
+  fast-verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,14 +27,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Fast Verify
+        run: npm run ci:fast
 
-      - name: Typecheck
-        run: npm run typecheck
+  full-regression:
+    if: github.event_name != 'pull_request'
+    needs: fast-verify
+    runs-on: ubuntu-latest
 
-      - name: Test
-        run: npm run test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Build
-        run: npm run build
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full Regression
+        run: npm run ci:full

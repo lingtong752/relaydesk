@@ -24,6 +24,7 @@
 - `npm run lint` ✅
 - `npm run typecheck` ✅
 - `npm test` ✅（`55 files / 154 tests passed`）
+- `npm run verify:claudecodeui-refactor` ✅（关键链路快速复验）
 
 ## 风险评估
 
@@ -39,6 +40,7 @@
 - [ ] run/approval：创建 run、approve/reject/takeover/resume。
 - [ ] terminal：创建、复连、关闭、权限边界。
 - [ ] plugins/git：在真实目录执行一次端到端冒烟。
+- [ ] 检查 CI：`fast-verify` 与 `full-regression` 均通过。
 
 ## 相关文档
 

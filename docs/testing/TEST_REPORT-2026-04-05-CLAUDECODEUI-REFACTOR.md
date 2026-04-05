@@ -8,6 +8,7 @@
 - 最新全量测试：`55 files / 154 tests passed`。
 - 复验命令：`npm run verify:claudecodeui-refactor`（关键回归链路）。
 - 复验结果：`7 files / 29 tests passed`（`projects/sessions/runs/terminal/tasks + chat/tools`）。
+- CI 分层：`fast-verify`（PR）+ `full-regression`（push/schedule）已接入。
 
 ## 本轮关键提交
 
@@ -27,12 +28,13 @@
 - `terminal`：list/create/close 的项目鉴权与 project guard。
 - `tasks`：项目 guard、patch 非法 payload、start-run 的 session 校验路径。
 
-## Phase 6 人工抽样清单（待执行）
+## Phase 6 人工抽样清单（已启动）
 
 - `chat`：创建会话 -> 发送消息 -> 切换会话，确认消息区与状态提示一致。
 - `tools`：从 chat 跳转到 files/terminal/git，确认绑定会话参数与上下文一致。
 - `run/approval`：从任务或聊天发起 run，走 approve/reject/takeover/resume 主链路。
 - `terminal`：创建终端、断线重连、关闭会话，确认 backlog 与权限边界。
+- 详细清单：`docs/testing/PHASE6_MANUAL_SAMPLING_CHECKLIST-2026-04-05.md`。
 
 ## 风险与遗留
 

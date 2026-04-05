@@ -41,6 +41,9 @@
   - `npm run typecheck` 通过。
   - `npm test` 通过（`55 files / 154 tests passed`）。
   - `npm run verify:claudecodeui-refactor` 可一键复验关键链路。
+- CI 分层：
+  - `fast-verify`：PR 快速门禁（`ci:fast`）。
+  - `full-regression`：push/schedule 全量回归（`ci:full`）。
 - 关键测试文件：
   - `apps/api/src/routes/projects.integration.test.ts`
   - `apps/api/src/routes/sessions.integration.test.ts`
@@ -67,6 +70,7 @@
 - 自动化覆盖已充分，但仍建议在真实仓库目录执行一次人工抽样：
   - 插件安装/升级/执行主链路。
   - Git fetch/pull/push 与分支切换链路。
+- API 错误契约已引入 `errorCode`，后续新增路由建议沿用同一模式。
 
 ## 回滚建议
 

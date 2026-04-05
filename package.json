@@ -19,6 +19,8 @@
     "test:watch": "vitest",
     "smoke:claudecodeui-refactor": "vitest run apps/api/src/routes/projects.integration.test.ts apps/api/src/routes/sessions.integration.test.ts apps/api/src/routes/runs.integration.test.ts apps/api/src/ws/terminal.integration.test.ts apps/api/src/routes/tasks.integration.test.ts apps/web/src/pages/WorkspaceChatPage.test.tsx apps/web/src/pages/WorkspaceToolsPage.test.tsx",
     "verify:claudecodeui-refactor": "npm run lint && npm run typecheck && npm run smoke:claudecodeui-refactor",
+    "ci:fast": "npm run verify:claudecodeui-refactor",
+    "ci:full": "npm run check",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build"
