@@ -123,3 +123,29 @@
 - M2：聊天域重构完成，体验与行为稳定。
 - M3：工具联动与 API 契约收口完成。
 - M4：全量回归完成，可合并主干。
+
+## 执行进度（持续更新）
+
+- 时间：2026-04-05（当前分支：`codex-refactor-claudecodeui`）
+- 当前状态：Phase 0/1/2 已完成；Phase 3 进行中（已完成多刀结构与副作用拆分）；Phase 4/5 关键能力已部分前置完成。
+- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`。
+
+### 已落地提交（按时间倒序）
+
+- `1968571` `refactor(web): centralize session origin labels in runtime helpers`
+- `b40f52a` `refactor(shared): centralize imported CLI resumable provider rules`
+- `d774c13` `refactor(chat): extract workspace chat page actions`
+- `def8027` `refactor(chat): extract current session panel view model`
+- `9c4c0e8` `refactor(chat): split composer and session runtime side-effect logic`
+- `ac910ab` `test(api): strengthen bootstrap and session message contract assertions`
+- `fc3846e` `refactor(api): extract project and session route state helpers`
+- `19c43f0` `refactor(workspace): extract bootstrap state reducers and selectors`
+- `3669f85` `refactor(chat): extract session list ordering and filter utilities`
+- `cee1176` `refactor(layout): extract project layout command palette types and utilities`
+- `08bf8f0` `test: add refactor guardrails for workspace navigation and session contracts`
+
+### 下一步（计划）
+
+- 继续 Phase 3：补齐 chat 域剩余组件的 view-model 与可复用状态转换函数。
+- 收口 Phase 4：统一 chat 与 files/terminal/git 绑定会话跳转策略的复用入口。
+- 收口 Phase 5：继续压缩路由层逻辑，补 `projects/sessions` 契约负例测试。
