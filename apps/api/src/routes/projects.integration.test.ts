@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import type { FastifyInstance } from "fastify";
+import { ObjectId } from "mongodb";
 import { createApp } from "../app.js";
 import type { CliSessionRunner } from "../services/cliSessionRunner.js";
 import { createInMemoryDatabase } from "../testUtils/inMemoryDatabase.js";
@@ -358,6 +359,48 @@ describe("project routes integration", () => {
     expect(secondResponse.statusCode).toBe(200);
     expect(secondBody.project.id).toBe(firstBody.project.id);
     expect(secondBody.project.name).toBe("demo");
+  });
+
+  it("returns stable 400 and 404 contracts for bootstrap identifiers", async () => {
+    const authHeader = await registerAndAuthenticate(app);
+
+    const invalidBootstrapResponse = await app.inject({
+      method: "GET",
+      url: "/api/projects/not-an-object-id/bootstrap",
+      headers: authHeader
+    });
+    expect(invalidBootstrapResponse.statusCode).toBe(400);
+    expect(invalidBootstrapResponse.json()).toEqual({
+      message: "Invalid project id"
+    });
+
+    const missingBootstrapResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${new ObjectId().toHexString()}/bootstrap`,
+      headers: authHeader
+    });
+    expect(missingBootstrapResponse.statusCode).toBe(404);
+    expect(missingBootstrapResponse.json()).toEqual({
+      message: "Project not found"
+    });
+  });
+
+  it("returns a stable validation error for invalid project payload", async () => {
+    const authHeader = await registerAndAuthenticate(app);
+
+    const invalidCreateResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "   "
+      }
+    });
+
+    expect(invalidCreateResponse.statusCode).toBe(400);
+    expect(invalidCreateResponse.json()).toEqual({
+      message: "Invalid payload"
+    });
   });
 });
 
