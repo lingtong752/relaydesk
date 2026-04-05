@@ -5,6 +5,7 @@ import { getAuthUser } from "../auth.js";
 import { parseObjectId } from "../db.js";
 import { getProviderTerminalSupport } from "../services/providerCore/index.js";
 import { resolveProjectRootPath } from "../services/projectRoot.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 import { TerminalManagerError } from "../services/terminalManager.js";
 
@@ -20,12 +21,12 @@ export async function registerTerminalRoutes(app: FastifyInstance): Promise<void
         const parsedProjectId = parseObjectId(projectId);
 
         if (!parsedProjectId) {
-          return reply.code(400).send({ message: "Invalid project id" });
+          return sendRouteContractError(reply, "invalidProjectId");
         }
 
         const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
         if (!project) {
-          return reply.code(404).send({ message: "Project not found" });
+          return sendRouteContractError(reply, "projectNotFound");
         }
 
         return {
@@ -53,12 +54,12 @@ export async function registerTerminalRoutes(app: FastifyInstance): Promise<void
         const parsedProjectId = parseObjectId(projectId);
 
         if (!parsedProjectId) {
-          return reply.code(400).send({ message: "Invalid project id" });
+          return sendRouteContractError(reply, "invalidProjectId");
         }
 
         const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
         if (!project) {
-          return reply.code(404).send({ message: "Project not found" });
+          return sendRouteContractError(reply, "projectNotFound");
         }
 
         let sourceSession: TerminalSessionRecord["sourceSession"] | undefined;
@@ -152,12 +153,12 @@ export async function registerTerminalRoutes(app: FastifyInstance): Promise<void
         const parsedProjectId = parseObjectId(params.projectId);
 
         if (!parsedProjectId) {
-          return reply.code(400).send({ message: "Invalid project id" });
+          return sendRouteContractError(reply, "invalidProjectId");
         }
 
         const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
         if (!project) {
-          return reply.code(404).send({ message: "Project not found" });
+          return sendRouteContractError(reply, "projectNotFound");
         }
 
         app.terminalManager.closeSession(params.sessionId, authUser.userId);

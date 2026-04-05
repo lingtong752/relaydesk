@@ -485,4 +485,49 @@ describe("terminal websocket integration", () => {
       })
     });
   });
+
+  it("returns stable negative contracts for terminal project guards", async () => {
+    const authHeader = { authorization: `Bearer ${token}` };
+
+    const invalidListResponse = await app.inject({
+      method: "GET",
+      url: "/api/projects/not-an-object-id/terminal/sessions",
+      headers: authHeader
+    });
+    expect(invalidListResponse.statusCode).toBe(400);
+    expect(invalidListResponse.json()).toEqual({
+      message: "Invalid project id"
+    });
+
+    const invalidCreateResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects/not-an-object-id/terminal/session",
+      headers: authHeader
+    });
+    expect(invalidCreateResponse.statusCode).toBe(400);
+    expect(invalidCreateResponse.json()).toEqual({
+      message: "Invalid project id"
+    });
+
+    const invalidCloseResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects/not-an-object-id/terminal/sessions/terminal-unknown/close",
+      headers: authHeader
+    });
+    expect(invalidCloseResponse.statusCode).toBe(400);
+    expect(invalidCloseResponse.json()).toEqual({
+      message: "Invalid project id"
+    });
+
+    const missingProjectId = new ObjectId().toHexString();
+    const missingListResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${missingProjectId}/terminal/sessions`,
+      headers: authHeader
+    });
+    expect(missingListResponse.statusCode).toBe(404);
+    expect(missingListResponse.json()).toEqual({
+      message: "Project not found"
+    });
+  });
 });
