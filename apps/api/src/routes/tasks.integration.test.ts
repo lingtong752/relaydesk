@@ -538,7 +538,8 @@ describe("task routes integration", () => {
     });
     expect(invalidProjectTasksResponse.statusCode).toBe(400);
     expect(invalidProjectTasksResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const missingProjectTasksResponse = await app.inject({
@@ -548,7 +549,8 @@ describe("task routes integration", () => {
     });
     expect(missingProjectTasksResponse.statusCode).toBe(404);
     expect(missingProjectTasksResponse.json()).toEqual({
-      message: "Project not found"
+      message: "Project not found",
+      errorCode: "PROJECT_NOT_FOUND"
     });
 
     const invalidPatchPayloadResponse = await app.inject({
@@ -561,7 +563,8 @@ describe("task routes integration", () => {
     });
     expect(invalidPatchPayloadResponse.statusCode).toBe(400);
     expect(invalidPatchPayloadResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
 
     const invalidSessionIdStartRunResponse = await app.inject({
@@ -575,7 +578,8 @@ describe("task routes integration", () => {
     });
     expect(invalidSessionIdStartRunResponse.statusCode).toBe(400);
     expect(invalidSessionIdStartRunResponse.json()).toEqual({
-      message: "Invalid session id"
+      message: "Invalid session id",
+      errorCode: "INVALID_SESSION_ID"
     });
 
     const missingSessionStartRunResponse = await app.inject({
@@ -589,7 +593,8 @@ describe("task routes integration", () => {
     });
     expect(missingSessionStartRunResponse.statusCode).toBe(404);
     expect(missingSessionStartRunResponse.json()).toEqual({
-      message: "Session not found"
+      message: "Session not found",
+      errorCode: "SESSION_NOT_FOUND"
     });
   });
 });

@@ -256,7 +256,8 @@ describe("session routes integration", () => {
     });
     expect(listInvalidProjectResponse.statusCode).toBe(400);
     expect(listInvalidProjectResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const createInvalidPayloadResponse = await app.inject({
@@ -270,7 +271,8 @@ describe("session routes integration", () => {
     });
     expect(createInvalidPayloadResponse.statusCode).toBe(400);
     expect(createInvalidPayloadResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
 
     const listInvalidSessionResponse = await app.inject({
@@ -280,7 +282,8 @@ describe("session routes integration", () => {
     });
     expect(listInvalidSessionResponse.statusCode).toBe(400);
     expect(listInvalidSessionResponse.json()).toEqual({
-      message: "Invalid session id"
+      message: "Invalid session id",
+      errorCode: "INVALID_SESSION_ID"
     });
   });
 
@@ -295,7 +298,8 @@ describe("session routes integration", () => {
     });
     expect(listMissingSessionResponse.statusCode).toBe(404);
     expect(listMissingSessionResponse.json()).toEqual({
-      message: "Session not found"
+      message: "Session not found",
+      errorCode: "SESSION_NOT_FOUND"
     });
 
     const orphanedSessionId = new ObjectId();
@@ -317,7 +321,8 @@ describe("session routes integration", () => {
     });
     expect(listOrphanedSessionResponse.statusCode).toBe(404);
     expect(listOrphanedSessionResponse.json()).toEqual({
-      message: "Project not found"
+      message: "Project not found",
+      errorCode: "PROJECT_NOT_FOUND"
     });
   });
 

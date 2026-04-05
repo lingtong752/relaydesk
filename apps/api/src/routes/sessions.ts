@@ -13,6 +13,7 @@ import {
   getImportedSessionContinuationError,
   resolveSessionStatusAfterUserMessage
 } from "../services/sessionDocs.js";
+import { logWithCorrelation } from "../services/observability.js";
 import { sendRouteContractError } from "../services/routeContracts.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 import {
@@ -91,6 +92,13 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       if (!created) {
         return reply.code(500).send({ message: "Failed to create session" });
       }
+
+      logWithCorrelation(request, "session.created", {
+        projectId: parsedProjectId.toHexString(),
+        sessionId: created._id?.toHexString() ?? null,
+        provider: created.provider,
+        origin: created.origin
+      });
 
       return { session: serializeWorkspaceSession(created, app.cliSessionRunner) };
     }
@@ -206,6 +214,14 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       app.hub.publish(`session:${session._id.toHexString()}`, {
         type: "message.created",
         payload: { message: serializeMessage(created) }
+      });
+
+      logWithCorrelation(request, "session.message.created", {
+        projectId: session.projectId.toHexString(),
+        sessionId: session._id.toHexString(),
+        messageId: created._id?.toHexString() ?? null,
+        provider: session.provider,
+        origin: session.origin
       });
 
       if (session.origin === "imported_cli") {

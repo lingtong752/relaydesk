@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { buildRejectedRunMessage } from "../services/approvalFlow.js";
 import { streamSurrogateRun } from "../services/mockStreams.js";
+import { logWithCorrelation } from "../services/observability.js";
 import { sendRouteContractError } from "../services/routeContracts.js";
 import { recordRunHistory, toRunIdentity } from "../services/runHistory.js";
 
@@ -159,6 +160,12 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
         });
       }
 
+      logWithCorrelation(request, "approval.approved", {
+        projectId: context.project._id?.toHexString() ?? null,
+        runId: context.run._id?.toHexString() ?? null,
+        approvalId: context.approval._id?.toHexString() ?? null
+      });
+
       return {
         approval: updatedApproval ? serializeApproval(updatedApproval) : null,
         run: updatedRun ? serializeRun(updatedRun) : null
@@ -253,6 +260,12 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
           payload: { run: serializeRun(updatedRun) }
         });
       }
+
+      logWithCorrelation(request, "approval.rejected", {
+        projectId: context.project._id?.toHexString() ?? null,
+        runId: context.run._id?.toHexString() ?? null,
+        approvalId: context.approval._id?.toHexString() ?? null
+      });
 
       return {
         approval: updatedApproval ? serializeApproval(updatedApproval) : null,

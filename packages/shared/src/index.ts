@@ -24,6 +24,20 @@ export type RunStatus =
   | "completed"
   | "failed";
 
+export type ApiErrorCode =
+  | "INVALID_PAYLOAD"
+  | "INVALID_PROJECT_ID"
+  | "INVALID_SESSION_ID"
+  | "INVALID_RUN_ID"
+  | "PROJECT_NOT_FOUND"
+  | "SESSION_NOT_FOUND"
+  | "RUN_NOT_FOUND";
+
+export interface ApiErrorRecord {
+  message: string;
+  errorCode?: ApiErrorCode | string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;

@@ -429,7 +429,8 @@ describe("run routes integration", () => {
     });
     expect(invalidProjectRunResponse.statusCode).toBe(400);
     expect(invalidProjectRunResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
 
     const invalidSessionIdRunResponse = await app.inject({
@@ -444,7 +445,8 @@ describe("run routes integration", () => {
     });
     expect(invalidSessionIdRunResponse.statusCode).toBe(400);
     expect(invalidSessionIdRunResponse.json()).toEqual({
-      message: "Invalid session id"
+      message: "Invalid session id",
+      errorCode: "INVALID_SESSION_ID"
     });
 
     const missingSessionRunResponse = await app.inject({
@@ -459,7 +461,8 @@ describe("run routes integration", () => {
     });
     expect(missingSessionRunResponse.statusCode).toBe(404);
     expect(missingSessionRunResponse.json()).toEqual({
-      message: "Session not found"
+      message: "Session not found",
+      errorCode: "SESSION_NOT_FOUND"
     });
 
     const invalidStopRunResponse = await app.inject({
@@ -469,7 +472,8 @@ describe("run routes integration", () => {
     });
     expect(invalidStopRunResponse.statusCode).toBe(400);
     expect(invalidStopRunResponse.json()).toEqual({
-      message: "Invalid run id"
+      message: "Invalid run id",
+      errorCode: "INVALID_RUN_ID"
     });
 
     const missingStopRunResponse = await app.inject({
@@ -479,7 +483,8 @@ describe("run routes integration", () => {
     });
     expect(missingStopRunResponse.statusCode).toBe(404);
     expect(missingStopRunResponse.json()).toEqual({
-      message: "Run not found"
+      message: "Run not found",
+      errorCode: "RUN_NOT_FOUND"
     });
   });
 
@@ -540,7 +545,8 @@ describe("run routes integration", () => {
     });
     expect(invalidApprovalsListResponse.statusCode).toBe(400);
     expect(invalidApprovalsListResponse.json()).toEqual({
-      message: "Invalid run id"
+      message: "Invalid run id",
+      errorCode: "INVALID_RUN_ID"
     });
 
     const missingApprovalsListResponse = await app.inject({
@@ -550,7 +556,8 @@ describe("run routes integration", () => {
     });
     expect(missingApprovalsListResponse.statusCode).toBe(404);
     expect(missingApprovalsListResponse.json()).toEqual({
-      message: "Run not found"
+      message: "Run not found",
+      errorCode: "RUN_NOT_FOUND"
     });
 
     const tooLongNote = "x".repeat(301);
@@ -562,7 +569,8 @@ describe("run routes integration", () => {
     });
     expect(invalidApprovePayloadResponse.statusCode).toBe(400);
     expect(invalidApprovePayloadResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
 
     const invalidRejectPayloadResponse = await app.inject({
@@ -573,7 +581,8 @@ describe("run routes integration", () => {
     });
     expect(invalidRejectPayloadResponse.statusCode).toBe(400);
     expect(invalidRejectPayloadResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
 
     const approvalsListResponse = await app.inject({

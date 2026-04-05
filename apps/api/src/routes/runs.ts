@@ -25,6 +25,7 @@ import {
   recordRunHistory,
   toRunIdentity
 } from "../services/runHistory.js";
+import { logWithCorrelation } from "../services/observability.js";
 import { sendRouteContractError } from "../services/routeContracts.js";
 
 const createRunSchema = z.object({
@@ -266,6 +267,13 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    logWithCorrelation(request, "run.restored", {
+      projectId: run.projectId.toHexString(),
+      runId: run._id?.toHexString() ?? null,
+      sessionId: run.sessionId.toHexString(),
+      checkpointId: checkpoint._id?.toHexString() ?? null
+    });
+
     return {
       run: updatedRun ? serializeRun(updatedRun) : null,
       approval: approval ? serializeApproval(approval) : null,
@@ -396,6 +404,13 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      logWithCorrelation(request, "run.created", {
+        projectId: parsedProjectId.toHexString(),
+        runId: run._id?.toHexString() ?? null,
+        sessionId: session._id?.toHexString() ?? null,
+        provider: session.provider
+      });
+
       return {
         run: serializeRun(run),
         approval: approval ? serializeApproval(approval) : null
@@ -466,6 +481,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
         });
       }
     }
+
+    logWithCorrelation(request, "run.stopped", {
+      projectId: run.projectId.toHexString(),
+      runId: run._id?.toHexString() ?? null,
+      sessionId: run.sessionId.toHexString()
+    });
 
     return { ok: true };
   });
@@ -558,6 +579,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
         });
       }
     }
+
+    logWithCorrelation(request, "run.taken_over", {
+      projectId: run.projectId.toHexString(),
+      runId: run._id?.toHexString() ?? null,
+      sessionId: run.sessionId.toHexString()
+    });
 
     return { run: updatedRun ? serializeRun(updatedRun) : null };
   });
@@ -661,6 +688,13 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
         payload: { run: serializeRun(updatedRun) }
       });
     }
+
+    logWithCorrelation(request, "run.resume_requested", {
+      projectId: run.projectId.toHexString(),
+      runId: run._id?.toHexString() ?? null,
+      sessionId: run.sessionId.toHexString(),
+      approvalId: approval?._id?.toHexString() ?? null
+    });
 
     return {
       run: updatedRun ? serializeRun(updatedRun) : null,

@@ -47,4 +47,24 @@ describe("app CORS", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
   });
+
+  it("echoes correlation id header or falls back to generated request id", async () => {
+    const explicit = await app.inject({
+      method: "GET",
+      url: "/api/health",
+      headers: {
+        "x-correlation-id": "corr-test-001"
+      }
+    });
+    expect(explicit.statusCode).toBe(200);
+    expect(explicit.headers["x-correlation-id"]).toBe("corr-test-001");
+
+    const generated = await app.inject({
+      method: "GET",
+      url: "/api/health"
+    });
+    expect(generated.statusCode).toBe(200);
+    expect(typeof generated.headers["x-correlation-id"]).toBe("string");
+    expect(generated.headers["x-correlation-id"]).not.toHaveLength(0);
+  });
 });

@@ -371,7 +371,8 @@ describe("project routes integration", () => {
     });
     expect(invalidBootstrapResponse.statusCode).toBe(400);
     expect(invalidBootstrapResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const missingBootstrapResponse = await app.inject({
@@ -381,7 +382,8 @@ describe("project routes integration", () => {
     });
     expect(missingBootstrapResponse.statusCode).toBe(404);
     expect(missingBootstrapResponse.json()).toEqual({
-      message: "Project not found"
+      message: "Project not found",
+      errorCode: "PROJECT_NOT_FOUND"
     });
   });
 
@@ -399,7 +401,8 @@ describe("project routes integration", () => {
 
     expect(invalidCreateResponse.statusCode).toBe(400);
     expect(invalidCreateResponse.json()).toEqual({
-      message: "Invalid payload"
+      message: "Invalid payload",
+      errorCode: "INVALID_PAYLOAD"
     });
   });
 });

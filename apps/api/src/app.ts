@@ -22,6 +22,7 @@ import { registerTerminalRoutes } from "./routes/terminal.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 import { LocalCliSessionRunner, type CliSessionRunner } from "./services/cliSessionRunner.js";
 import { StreamRegistry } from "./services/mockStreams.js";
+import { applyCorrelationIdHeader } from "./services/observability.js";
 import { TerminalManager, TerminalManagerError } from "./services/terminalManager.js";
 import { SessionHub } from "./ws/sessionHub.js";
 import { createInMemoryDatabase } from "./testUtils/inMemoryDatabase.js";
@@ -96,6 +97,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   app.decorate("streamRegistry", streamRegistry);
   app.decorate("terminalManager", terminalManager);
   app.decorate("authenticate", authenticate);
+
+  app.addHook("onRequest", (request, reply, done) => {
+    applyCorrelationIdHeader(request, reply);
+    done();
+  });
 
   if (shouldCloseDb) {
     app.addHook("onClose", async () => {

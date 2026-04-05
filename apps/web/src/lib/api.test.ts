@@ -39,4 +39,24 @@ describe("api request headers", () => {
     });
     expect(init?.body).toBe(JSON.stringify({ name: "Demo", rootPath: "" }));
   });
+
+  it("exposes api errorCode on request failures", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        message: "Invalid project id",
+        errorCode: "INVALID_PROJECT_ID"
+      })
+    } as Response);
+
+    await expect(api.getMessages("token-demo", "session-demo")).rejects.toEqual(
+      expect.objectContaining({
+        name: "ApiRequestError",
+        statusCode: 400,
+        message: "Invalid project id",
+        errorCode: "INVALID_PROJECT_ID"
+      })
+    );
+  });
 });

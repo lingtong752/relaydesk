@@ -496,7 +496,8 @@ describe("terminal websocket integration", () => {
     });
     expect(invalidListResponse.statusCode).toBe(400);
     expect(invalidListResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const invalidCreateResponse = await app.inject({
@@ -506,7 +507,8 @@ describe("terminal websocket integration", () => {
     });
     expect(invalidCreateResponse.statusCode).toBe(400);
     expect(invalidCreateResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const invalidCloseResponse = await app.inject({
@@ -516,7 +518,8 @@ describe("terminal websocket integration", () => {
     });
     expect(invalidCloseResponse.statusCode).toBe(400);
     expect(invalidCloseResponse.json()).toEqual({
-      message: "Invalid project id"
+      message: "Invalid project id",
+      errorCode: "INVALID_PROJECT_ID"
     });
 
     const missingProjectId = new ObjectId().toHexString();
@@ -527,7 +530,8 @@ describe("terminal websocket integration", () => {
     });
     expect(missingListResponse.statusCode).toBe(404);
     expect(missingListResponse.json()).toEqual({
-      message: "Project not found"
+      message: "Project not found",
+      errorCode: "PROJECT_NOT_FOUND"
     });
   });
 });

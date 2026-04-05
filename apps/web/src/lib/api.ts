@@ -1,4 +1,5 @@
 import type {
+  ApiErrorRecord,
   ApprovalRecord,
   AuditEventRecord,
   DiscoveredProjectRecord,
@@ -37,12 +38,14 @@ type HttpMethod = "GET" | "POST" | "PATCH";
 export class ApiRequestError extends Error {
   readonly statusCode: number;
   readonly payload: unknown;
+  readonly errorCode?: string;
 
-  constructor(message: string, statusCode: number, payload: unknown) {
+  constructor(message: string, statusCode: number, payload: unknown, errorCode?: string) {
     super(message);
     this.name = "ApiRequestError";
     this.statusCode = statusCode;
     this.payload = payload;
+    this.errorCode = errorCode;
   }
 }
 
@@ -66,11 +69,12 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const error = (await response.json().catch(() => null)) as { message?: string } | null;
+    const error = (await response.json().catch(() => null)) as ApiErrorRecord | null;
     throw new ApiRequestError(
       error?.message ?? `Request failed with ${response.status}`,
       response.status,
-      error
+      error,
+      error?.errorCode
     );
   }
 
