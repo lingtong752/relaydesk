@@ -482,4 +482,116 @@ describe("run routes integration", () => {
       message: "Run not found"
     });
   });
+
+  it("returns stable negative contracts for approval listing and resolution payloads", async () => {
+    const registerResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        email: "approval-negative-contracts@example.com",
+        password: "password123"
+      }
+    });
+    const registerBody = registerResponse.json() as { token: string };
+    const authHeader = { authorization: `Bearer ${registerBody.token}` };
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "Approval Contracts",
+        rootPath: "/workspace/approval-contracts"
+      }
+    });
+    const projectBody = projectResponse.json() as { project: { id: string } };
+
+    const sessionResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectBody.project.id}/sessions`,
+      headers: authHeader,
+      payload: {
+        title: "Approval Session",
+        provider: "mock"
+      }
+    });
+    const sessionBody = sessionResponse.json() as { session: { id: string } };
+
+    const createRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectBody.project.id}/runs`,
+      headers: authHeader,
+      payload: {
+        sessionId: sessionBody.session.id,
+        objective: "check contracts",
+        constraints: ""
+      }
+    });
+    expect(createRunResponse.statusCode).toBe(200);
+    const createRunBody = createRunResponse.json() as {
+      run: { id: string };
+      approval: { id: string };
+    };
+
+    const invalidApprovalsListResponse = await app.inject({
+      method: "GET",
+      url: "/api/runs/not-an-object-id/approvals",
+      headers: authHeader
+    });
+    expect(invalidApprovalsListResponse.statusCode).toBe(400);
+    expect(invalidApprovalsListResponse.json()).toEqual({
+      message: "Invalid run id"
+    });
+
+    const missingApprovalsListResponse = await app.inject({
+      method: "GET",
+      url: `/api/runs/${new ObjectId().toHexString()}/approvals`,
+      headers: authHeader
+    });
+    expect(missingApprovalsListResponse.statusCode).toBe(404);
+    expect(missingApprovalsListResponse.json()).toEqual({
+      message: "Run not found"
+    });
+
+    const tooLongNote = "x".repeat(301);
+    const invalidApprovePayloadResponse = await app.inject({
+      method: "POST",
+      url: `/api/approvals/${createRunBody.approval.id}/approve`,
+      headers: authHeader,
+      payload: { note: tooLongNote }
+    });
+    expect(invalidApprovePayloadResponse.statusCode).toBe(400);
+    expect(invalidApprovePayloadResponse.json()).toEqual({
+      message: "Invalid payload"
+    });
+
+    const invalidRejectPayloadResponse = await app.inject({
+      method: "POST",
+      url: `/api/approvals/${createRunBody.approval.id}/reject`,
+      headers: authHeader,
+      payload: { note: tooLongNote }
+    });
+    expect(invalidRejectPayloadResponse.statusCode).toBe(400);
+    expect(invalidRejectPayloadResponse.json()).toEqual({
+      message: "Invalid payload"
+    });
+
+    const approvalsListResponse = await app.inject({
+      method: "GET",
+      url: `/api/runs/${createRunBody.run.id}/approvals`,
+      headers: authHeader
+    });
+    expect(approvalsListResponse.statusCode).toBe(200);
+    const approvalsListBody = approvalsListResponse.json() as {
+      approvals: Array<{ id: string; status: string }>;
+    };
+    expect(approvalsListBody.approvals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: createRunBody.approval.id,
+          status: "pending"
+        })
+      ])
+    );
+  });
 });

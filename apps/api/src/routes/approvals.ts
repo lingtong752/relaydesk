@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { buildRejectedRunMessage } from "../services/approvalFlow.js";
 import { streamSurrogateRun } from "../services/mockStreams.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 import { recordRunHistory, toRunIdentity } from "../services/runHistory.js";
 
 const resolveApprovalSchema = z.object({
@@ -65,17 +66,17 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
     const parsedRunId = parseObjectId(runId);
 
     if (!parsedRunId) {
-      return reply.code(400).send({ message: "Invalid run id" });
+      return sendRouteContractError(reply, "invalidRunId");
     }
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     const approvals = await app.db.collections.approvals
@@ -92,7 +93,7 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
     const parsedBody = resolveApprovalSchema.safeParse(request.body ?? {});
 
     if (!parsedBody.success) {
-      return reply.code(400).send({ message: "Invalid payload" });
+      return sendRouteContractError(reply, "invalidPayload");
     }
 
     try {
@@ -175,7 +176,7 @@ export async function registerApprovalRoutes(app: FastifyInstance): Promise<void
     const parsedBody = resolveApprovalSchema.safeParse(request.body ?? {});
 
     if (!parsedBody.success) {
-      return reply.code(400).send({ message: "Invalid payload" });
+      return sendRouteContractError(reply, "invalidPayload");
     }
 
     try {
