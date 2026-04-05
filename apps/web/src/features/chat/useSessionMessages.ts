@@ -2,15 +2,10 @@ import { useEffect, useState } from "react";
 import type { MessageRecord, RealtimeEvent } from "@shared";
 import { api } from "../../lib/api";
 import type { RealtimeClient } from "../../lib/ws";
-
-function mergeMessages(current: MessageRecord[], incoming: MessageRecord): MessageRecord[] {
-  const existing = current.find((item) => item.id === incoming.id);
-  if (!existing) {
-    return [...current, incoming].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  }
-
-  return current.map((item) => (item.id === incoming.id ? incoming : item));
-}
+import {
+  applyRealtimeEventToMessages,
+  normalizeMessageDraftForSend
+} from "./sessionMessagesState";
 
 interface UseSessionMessagesOptions {
   token: string | null;
@@ -87,41 +82,24 @@ export function useSessionMessages({
       return;
     }
 
-    if (
-      lastRealtimeEvent.type === "message.created" &&
-      lastRealtimeEvent.payload.message.sessionId === selectedSessionId
-    ) {
-      setMessages((current) => mergeMessages(current, lastRealtimeEvent.payload.message));
-      return;
-    }
-
-    if (lastRealtimeEvent.type === "message.delta") {
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === lastRealtimeEvent.payload.messageId
-            ? { ...item, content: `${item.content}${lastRealtimeEvent.payload.delta}`, status: "streaming" }
-            : item
-        )
-      );
-      return;
-    }
-
-    if (
-      lastRealtimeEvent.type === "message.completed" &&
-      lastRealtimeEvent.payload.message.sessionId === selectedSessionId
-    ) {
-      setMessages((current) => mergeMessages(current, lastRealtimeEvent.payload.message));
-    }
+    setMessages((current) =>
+      applyRealtimeEventToMessages({
+        current,
+        event: lastRealtimeEvent,
+        selectedSessionId
+      })
+    );
   }, [lastRealtimeEvent, selectedSessionId]);
 
   async function sendMessage(): Promise<void> {
-    if (!token || !selectedSessionId || !messageDraft.trim()) {
+    const normalizedDraft = normalizeMessageDraftForSend(messageDraft);
+    if (!token || !selectedSessionId || !normalizedDraft) {
       return;
     }
 
     clearChatError();
     try {
-      await api.sendMessage(token, selectedSessionId, { content: messageDraft.trim() });
+      await api.sendMessage(token, selectedSessionId, { content: normalizedDraft });
       setMessageDraftState("");
     } catch (sendError) {
       setPageError(sendError instanceof Error ? sendError.message : "发送失败");

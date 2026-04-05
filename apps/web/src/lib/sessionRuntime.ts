@@ -1,10 +1,31 @@
 import type { SessionRecord } from "@shared";
 
 type SessionCapabilities = NonNullable<SessionRecord["capabilities"]>;
+const RESUMABLE_IMPORTED_PROVIDERS = new Set<SessionRecord["provider"]>([
+  "claude",
+  "codex",
+  "gemini"
+]);
+
+function createEmptyCapabilities(): SessionCapabilities {
+  return {
+    canSendMessages: false,
+    canResume: false,
+    canStartRuns: false,
+    canAttachTerminal: false
+  };
+}
+
+function isImportedResumableSession(session: SessionRecord): boolean {
+  return session.origin === "imported_cli" && RESUMABLE_IMPORTED_PROVIDERS.has(session.provider);
+}
+
+function formatZhCnTimestamp(value: string): string {
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
 
 function buildFallbackCapabilities(session: SessionRecord): SessionCapabilities {
-  const importedResumable =
-    session.origin === "imported_cli" && ["claude", "codex", "gemini"].includes(session.provider);
+  const importedResumable = isImportedResumableSession(session);
 
   return {
     canSendMessages: session.origin === "relaydesk" || importedResumable,
@@ -16,12 +37,7 @@ function buildFallbackCapabilities(session: SessionRecord): SessionCapabilities 
 
 export function getSessionCapabilities(session: SessionRecord | null): SessionCapabilities {
   if (!session) {
-    return {
-      canSendMessages: false,
-      canResume: false,
-      canStartRuns: false,
-      canAttachTerminal: false
-    };
+    return createEmptyCapabilities();
   }
 
   return session.capabilities ?? buildFallbackCapabilities(session);
@@ -42,13 +58,13 @@ export function getSessionResumeStatusLabel(session: SessionRecord | null): stri
 
   if (session.lastResumeStatus === "succeeded") {
     return session.lastResumedAt
-      ? `最近恢复成功：${new Date(session.lastResumedAt).toLocaleString("zh-CN", { hour12: false })}`
+      ? `最近恢复成功：${formatZhCnTimestamp(session.lastResumedAt)}`
       : "最近恢复成功";
   }
 
   if (session.lastResumeStatus === "aborted") {
     return session.lastResumeAttemptAt
-      ? `最近恢复已中止：${new Date(session.lastResumeAttemptAt).toLocaleString("zh-CN", { hour12: false })}`
+      ? `最近恢复已中止：${formatZhCnTimestamp(session.lastResumeAttemptAt)}`
       : "最近恢复已中止";
   }
 

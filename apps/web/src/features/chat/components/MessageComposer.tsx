@@ -1,4 +1,8 @@
 import { useRef } from "react";
+import {
+  canSubmitMessageDraft,
+  shouldSubmitMessageComposerOnEnter
+} from "./messageComposer/utils";
 
 interface MessageComposerProps {
   disabled: boolean;
@@ -16,6 +20,7 @@ export function MessageComposer({
   onSubmit
 }: MessageComposerProps): JSX.Element {
   const formRef = useRef<HTMLFormElement | null>(null);
+  const submitEnabled = canSubmitMessageDraft({ disabled, messageDraft });
 
   return (
     <form className="chat-form" onSubmit={onSubmit} ref={formRef}>
@@ -24,7 +29,14 @@ export function MessageComposer({
         disabled={disabled}
         onChange={(event) => onDraftChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key !== "Enter" || event.shiftKey || disabled || !messageDraft.trim()) {
+          if (
+            !shouldSubmitMessageComposerOnEnter({
+              key: event.key,
+              shiftKey: event.shiftKey,
+              disabled,
+              messageDraft
+            })
+          ) {
             return;
           }
 
@@ -36,7 +48,7 @@ export function MessageComposer({
         value={messageDraft}
       />
       <div className="chat-form-actions">
-        <button className="primary-button" disabled={disabled || !messageDraft.trim()} type="submit">
+        <button className="primary-button" disabled={!submitEnabled} type="submit">
           发送消息
         </button>
       </div>
