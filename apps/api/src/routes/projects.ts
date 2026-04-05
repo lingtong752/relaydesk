@@ -17,6 +17,7 @@ import {
   linkDiscoveredProjects,
   resolveActiveSessionId
 } from "../services/projectRouteState.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 
 const createProjectSchema = z.object({
@@ -77,7 +78,7 @@ export async function registerProjectRoutes(
   app.post("/api/projects", { preHandler: app.authenticate }, async (request, reply) => {
     const parsed = createProjectSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ message: "Invalid payload" });
+      return sendRouteContractError(reply, "invalidPayload");
     }
 
     const authUser = getAuthUser(request);
@@ -123,12 +124,12 @@ export async function registerProjectRoutes(
 
       const parsedProjectId = ObjectId.isValid(projectId) ? new ObjectId(projectId) : null;
       if (!parsedProjectId) {
-        return reply.code(400).send({ message: "Invalid project id" });
+        return sendRouteContractError(reply, "invalidProjectId");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const discoveredProject = await findDiscoveredProjectByRoot({

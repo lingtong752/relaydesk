@@ -13,6 +13,7 @@ import {
   getImportedSessionContinuationError,
   resolveSessionStatusAfterUserMessage
 } from "../services/sessionDocs.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
 import {
   streamImportedCliSessionMessage,
@@ -39,12 +40,12 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       const parsedProjectId = parseObjectId(projectId);
 
       if (!parsedProjectId) {
-        return reply.code(400).send({ message: "Invalid project id" });
+        return sendRouteContractError(reply, "invalidProjectId");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const sessions = await app.db.collections.sessions
@@ -69,12 +70,12 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       const parsedBody = createSessionSchema.safeParse(request.body);
 
       if (!parsedProjectId || !parsedBody.success) {
-        return reply.code(400).send({ message: "Invalid payload" });
+        return sendRouteContractError(reply, "invalidPayload");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const now = new Date();
@@ -105,17 +106,17 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       const parsedSessionId = parseObjectId(sessionId);
 
       if (!parsedSessionId) {
-        return reply.code(400).send({ message: "Invalid session id" });
+        return sendRouteContractError(reply, "invalidSessionId");
       }
 
       const session = await app.db.collections.sessions.findOne({ _id: parsedSessionId });
       if (!session) {
-        return reply.code(404).send({ message: "Session not found" });
+        return sendRouteContractError(reply, "sessionNotFound");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: session.projectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       if (session.origin === "imported_cli") {
@@ -152,17 +153,17 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       const parsedBody = createMessageSchema.safeParse(request.body);
 
       if (!parsedSessionId || !parsedBody.success) {
-        return reply.code(400).send({ message: "Invalid payload" });
+        return sendRouteContractError(reply, "invalidPayload");
       }
 
       const session = await app.db.collections.sessions.findOne({ _id: parsedSessionId });
       if (!session) {
-        return reply.code(404).send({ message: "Session not found" });
+        return sendRouteContractError(reply, "sessionNotFound");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: session.projectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const importedSessionError = getImportedSessionContinuationError({
@@ -245,17 +246,17 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
       const parsedSessionId = parseObjectId(sessionId);
 
       if (!parsedSessionId) {
-        return reply.code(400).send({ message: "Invalid session id" });
+        return sendRouteContractError(reply, "invalidSessionId");
       }
 
       const session = await app.db.collections.sessions.findOne({ _id: parsedSessionId });
       if (!session) {
-        return reply.code(404).send({ message: "Session not found" });
+        return sendRouteContractError(reply, "sessionNotFound");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: session.projectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       app.streamRegistry.stopSession(session._id.toHexString());
