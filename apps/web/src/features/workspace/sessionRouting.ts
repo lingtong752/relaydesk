@@ -26,14 +26,52 @@ export function getSessionIdFromSearch(search: string): string | undefined {
   return sessionId ? sessionId : undefined;
 }
 
-export function findBoundSessionBySearch(
+function findSessionById(
   sessions: SessionRecord[],
-  search: string
+  sessionId: string | undefined
 ): SessionRecord | null {
-  const sessionId = getSessionIdFromSearch(search);
   if (!sessionId) {
     return null;
   }
 
   return sessions.find((session) => session.id === sessionId) ?? null;
+}
+
+export function resolveWorkspaceToolSessionId(input: {
+  sessions: SessionRecord[];
+  search: string;
+  selectedSessionId?: string | null;
+}): string | undefined {
+  const byQuery = getSessionIdFromSearch(input.search);
+  if (findSessionById(input.sessions, byQuery)) {
+    return byQuery;
+  }
+
+  const normalizedSelectedSessionId = input.selectedSessionId?.trim();
+  if (findSessionById(input.sessions, normalizedSelectedSessionId)) {
+    return normalizedSelectedSessionId;
+  }
+
+  return undefined;
+}
+
+export function resolveWorkspaceToolSession(input: {
+  sessions: SessionRecord[];
+  search: string;
+  selectedSessionId?: string | null;
+}): SessionRecord | null {
+  return findSessionById(
+    input.sessions,
+    resolveWorkspaceToolSessionId(input)
+  );
+}
+
+export function findBoundSessionBySearch(
+  sessions: SessionRecord[],
+  search: string
+): SessionRecord | null {
+  return resolveWorkspaceToolSession({
+    sessions,
+    search
+  });
 }

@@ -111,11 +111,26 @@ describe("WorkspaceTools routes", () => {
   });
 
   it("passes the current session query into the terminal workspace", () => {
-    vi.mocked(useProjectWorkspace).mockReturnValue(createWorkspaceContext());
+    vi.mocked(useProjectWorkspace).mockReturnValue(
+      createWorkspaceContext({
+        sessions: [
+          {
+            id: "session-123",
+            projectId: "project-demo",
+            title: "会话 123",
+            provider: "codex",
+            origin: "relaydesk",
+            status: "idle",
+            createdAt: "2026-03-29T08:00:00.000Z",
+            updatedAt: "2026-03-29T08:00:00.000Z"
+          }
+        ]
+      })
+    );
 
     const markup = renderToolsRoute("/workspace/project-demo/tools/terminal?sessionId=session-123");
 
-    expect(markup).toContain("terminal-workspace-panel:session-123:0");
+    expect(markup).toContain("terminal-workspace-panel:session-123:1");
   });
 
   it("passes the current session query into the file workspace", () => {
@@ -170,5 +185,33 @@ describe("WorkspaceTools routes", () => {
     const markup = renderToolsRoute("/workspace/project-demo/tools/git");
 
     expect(markup).toContain("git-workspace-panel:none");
+  });
+
+  it("falls back to selected session when tools route has no session query", () => {
+    vi.mocked(useProjectWorkspace).mockReturnValue(
+      createWorkspaceContext({
+        selectedSessionId: "session-123",
+        sessions: [
+          {
+            id: "session-123",
+            projectId: "project-demo",
+            title: "会话 123",
+            provider: "codex",
+            origin: "relaydesk",
+            status: "idle",
+            createdAt: "2026-03-29T08:00:00.000Z",
+            updatedAt: "2026-03-29T08:00:00.000Z"
+          }
+        ]
+      })
+    );
+
+    const filesMarkup = renderToolsRoute("/workspace/project-demo/tools/files");
+    const terminalMarkup = renderToolsRoute("/workspace/project-demo/tools/terminal");
+    const gitMarkup = renderToolsRoute("/workspace/project-demo/tools/git");
+
+    expect(filesMarkup).toContain("files-workspace-panel:session-123");
+    expect(terminalMarkup).toContain("terminal-workspace-panel:session-123:1");
+    expect(gitMarkup).toContain("git-workspace-panel:session-123");
   });
 });

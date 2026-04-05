@@ -4,7 +4,9 @@ import {
   buildWorkspaceChatPath,
   buildWorkspaceToolPath,
   findBoundSessionBySearch,
-  getSessionIdFromSearch
+  getSessionIdFromSearch,
+  resolveWorkspaceToolSession,
+  resolveWorkspaceToolSessionId
 } from "./sessionRouting";
 
 function createSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
@@ -53,5 +55,41 @@ describe("sessionRouting", () => {
 
     expect(findBoundSessionBySearch(sessions, "?sessionId=session-b")?.id).toBe("session-b");
     expect(findBoundSessionBySearch(sessions, "?sessionId=missing")).toBeNull();
+  });
+
+  it("resolves tool-bound session from query first, then selected session fallback", () => {
+    const sessions = [
+      createSession({ id: "session-a" }),
+      createSession({ id: "session-b" })
+    ];
+
+    expect(
+      resolveWorkspaceToolSessionId({
+        sessions,
+        search: "?sessionId=session-b",
+        selectedSessionId: "session-a"
+      })
+    ).toBe("session-b");
+    expect(
+      resolveWorkspaceToolSessionId({
+        sessions,
+        search: "?sessionId=missing",
+        selectedSessionId: "session-a"
+      })
+    ).toBe("session-a");
+    expect(
+      resolveWorkspaceToolSession({
+        sessions,
+        search: "",
+        selectedSessionId: "session-a"
+      })?.id
+    ).toBe("session-a");
+    expect(
+      resolveWorkspaceToolSession({
+        sessions,
+        search: "",
+        selectedSessionId: "missing"
+      })
+    ).toBeNull();
   });
 });
