@@ -4,7 +4,7 @@
 
 - 目标：补齐 ClaudeCodeUI 重构的人工链路验收证据。
 - 状态：已创建清单并完成自动化替代证据；真实交互抽样待执行。
-- 自动化替代：`npm run verify:claudecodeui-refactor`（`7 files / 29 tests passed`）。
+- 自动化替代：`npm run verify:claudecodeui-refactor`（`7 files / 30 tests passed`）。
 
 ## 抽样项
 

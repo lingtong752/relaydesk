@@ -128,11 +128,11 @@
 
 - 时间：2026-04-05（当前分支：`codex-refactor-claudecodeui`）
 - 当前状态：Phase 0/1/2/3/4/5 已完成；Phase 6 进行中（已产出抽样清单与合并材料，待真实环境抽样确认）。
-- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`55 files / 154 tests passed`）。
+- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`55 files / 158 tests passed`）。
 - 阶段产物：已新增 `docs/testing/TEST_REPORT-2026-04-05-CLAUDECODEUI-REFACTOR.md` 作为 Phase 6 回归基线。
 - 阶段产物：已新增 `docs/project-management/CLAUDECODEUI_REFACTOR_MERGE_NOTES.zh-CN.md` 作为合并审阅材料。
 - 阶段产物：已新增 `docs/project-management/CLAUDECODEUI_REFACTOR_PR_TEMPLATE.zh-CN.md` 作为 PR 提交流水线模板。
-- 阶段产物：新增 `npm run verify:claudecodeui-refactor` 一键复验命令（关键链路 `7 files / 29 tests`）。
+- 阶段产物：新增 `npm run verify:claudecodeui-refactor` 一键复验命令（关键链路 `7 files / 30 tests`）。
 - 阶段产物：新增 `docs/testing/PHASE6_MANUAL_SAMPLING_CHECKLIST-2026-04-05.md` 人工抽样清单。
 
 ### 已落地提交（按时间倒序）

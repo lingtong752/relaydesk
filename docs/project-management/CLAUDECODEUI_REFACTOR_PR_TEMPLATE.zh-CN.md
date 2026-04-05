@@ -23,7 +23,7 @@
 
 - `npm run lint` ✅
 - `npm run typecheck` ✅
-- `npm test` ✅（`55 files / 154 tests passed`）
+- `npm test` ✅（`55 files / 158 tests passed`）
 - `npm run verify:claudecodeui-refactor` ✅（关键链路快速复验）
 
 ## 风险评估

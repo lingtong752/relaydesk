@@ -4,7 +4,7 @@
 
 - 建议：可合并。
 - 结论依据：重构分阶段完成，且每阶段均通过 `npm run lint && npm run typecheck && npm test`。
-- 最新门禁结果：`55 files / 154 tests passed`。
+- 最新门禁结果：`55 files / 158 tests passed`。
 
 ## 变更范围
 
@@ -39,7 +39,7 @@
 - 自动化门禁：
   - `npm run lint` 通过。
   - `npm run typecheck` 通过。
-  - `npm test` 通过（`55 files / 154 tests passed`）。
+  - `npm test` 通过（`55 files / 158 tests passed`）。
   - `npm run verify:claudecodeui-refactor` 可一键复验关键链路。
 - CI 分层：
   - `fast-verify`：PR 快速门禁（`ci:fast`）。
