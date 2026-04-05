@@ -3,6 +3,16 @@ export type SessionRuntimeMode = "api_mode" | "cli_session_mode";
 export type SessionResumeStatus = "succeeded" | "failed" | "aborted";
 export type SessionStatus = "idle" | "running" | "reconnecting" | "stopped" | "failed";
 
+export const IMPORTED_CLI_RESUMABLE_PROVIDERS: ReadonlyArray<ProviderId> = [
+  "claude",
+  "codex",
+  "gemini"
+];
+
+export function canResumeImportedCliProvider(provider: ProviderId): boolean {
+  return IMPORTED_CLI_RESUMABLE_PROVIDERS.includes(provider);
+}
+
 export type MessageRole = "human" | "surrogate" | "provider" | "system" | "tool";
 export type MessageStatus = "pending" | "streaming" | "completed" | "stopped" | "failed";
 export type RunStatus =

@@ -2,7 +2,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import type { ProviderId } from "@shared";
+import {
+  canResumeImportedCliProvider,
+  type ProviderId
+} from "@shared";
 
 export interface CliSessionResumeRequest {
   provider: ProviderId;
@@ -230,7 +233,7 @@ function parseGeminiResult(
 
 export class LocalCliSessionRunner implements CliSessionRunner {
   supportsImportedSession(provider: ProviderId): boolean {
-    return provider === "claude" || provider === "codex" || provider === "gemini";
+    return canResumeImportedCliProvider(provider);
   }
 
   async resumeSession(input: CliSessionResumeRequest): Promise<CliSessionResumeResult> {

@@ -1,11 +1,9 @@
-import type { SessionRecord } from "@shared";
+import {
+  canResumeImportedCliProvider,
+  type SessionRecord
+} from "@shared";
 
 type SessionCapabilities = NonNullable<SessionRecord["capabilities"]>;
-const RESUMABLE_IMPORTED_PROVIDERS = new Set<SessionRecord["provider"]>([
-  "claude",
-  "codex",
-  "gemini"
-]);
 
 function createEmptyCapabilities(): SessionCapabilities {
   return {
@@ -17,7 +15,7 @@ function createEmptyCapabilities(): SessionCapabilities {
 }
 
 function isImportedResumableSession(session: SessionRecord): boolean {
-  return session.origin === "imported_cli" && RESUMABLE_IMPORTED_PROVIDERS.has(session.provider);
+  return session.origin === "imported_cli" && canResumeImportedCliProvider(session.provider);
 }
 
 function formatZhCnTimestamp(value: string): string {

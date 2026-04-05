@@ -1,4 +1,7 @@
-import type { SessionRecord } from "@shared";
+import {
+  canResumeImportedCliProvider,
+  type SessionRecord
+} from "@shared";
 import { SectionHeader } from "../../../shared/ui/SectionHeader";
 import { StatusPill } from "../../../shared/ui/StatusPill";
 
@@ -47,7 +50,7 @@ export function AgentStatusHeader({
 }: AgentStatusHeaderProps): JSX.Element {
   const canRunImportedCliSession =
     selectedSession?.origin === "imported_cli" &&
-    ["claude", "codex", "gemini"].includes(selectedSession.provider);
+    canResumeImportedCliProvider(selectedSession.provider);
   const title = activeRunStatus
     ? formatActiveRunHeading(activeRunStatus)
     : displayedRunStatus
