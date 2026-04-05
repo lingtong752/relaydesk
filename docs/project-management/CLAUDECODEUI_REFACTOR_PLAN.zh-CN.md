@@ -130,6 +130,7 @@
 - 当前状态：Phase 0/1/2/3/4/5 已完成；Phase 6 进行中（开始整理人工抽样回归清单）。
 - 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`55 files / 154 tests passed`）。
 - 阶段产物：已新增 `docs/testing/TEST_REPORT-2026-04-05-CLAUDECODEUI-REFACTOR.md` 作为 Phase 6 回归基线。
+- 阶段产物：已新增 `docs/project-management/CLAUDECODEUI_REFACTOR_MERGE_NOTES.zh-CN.md` 作为合并审阅材料。
 
 ### 已落地提交（按时间倒序）
 
@@ -159,4 +160,4 @@
 
 - 启动 Phase 6：整理人工抽样回归清单（chat -> tools -> run -> approval 主链路）。
 - Phase 6 执行：按“会话创建 -> 消息收发 -> tool 跳转 -> run 审批 -> terminal 复连”链路逐项记录检查结果。
-- 收尾准备：汇总重构改动清单与风险余项，准备合并说明。
+- 收尾准备：合并说明已产出，剩余真实目录人工抽样与 PR 提交。

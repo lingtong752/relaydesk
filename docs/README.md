@@ -28,6 +28,7 @@
 - 开发待办：[project-management/BACKLOG.zh-CN.md](./project-management/BACKLOG.zh-CN.md)
 - CLI session 与插件平台计划：[project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md](./project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md)
 - ClaudeCodeUI 重构计划：[project-management/CLAUDECODEUI_REFACTOR_PLAN.zh-CN.md](./project-management/CLAUDECODEUI_REFACTOR_PLAN.zh-CN.md)
+- ClaudeCodeUI 重构合并说明：[project-management/CLAUDECODEUI_REFACTOR_MERGE_NOTES.zh-CN.md](./project-management/CLAUDECODEUI_REFACTOR_MERGE_NOTES.zh-CN.md)
 - 架构总览：[architecture/ARCHITECTURE_OVERVIEW.zh-CN.md](./architecture/ARCHITECTURE_OVERVIEW.zh-CN.md)
 - API 规范：[architecture/API_SPEC.zh-CN.md](./architecture/API_SPEC.zh-CN.md)
 - 数据模型：[architecture/DATA_MODEL.zh-CN.md](./architecture/DATA_MODEL.zh-CN.md)
