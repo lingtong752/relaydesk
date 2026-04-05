@@ -127,11 +127,13 @@
 ## 执行进度（持续更新）
 
 - 时间：2026-04-05（当前分支：`codex-refactor-claudecodeui`）
-- 当前状态：Phase 0/1/2/3/4 已完成；Phase 5 进行中（已完成 `projects/sessions` 负向契约覆盖 + 共享错误契约 helper 收敛）。
-- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`55 files / 150 tests passed`）。
+- 当前状态：Phase 0/1/2/3/4 已完成；Phase 5 进行中（已完成 `projects/sessions/runs` 错误契约收敛与负向用例补齐）。
+- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`55 files / 151 tests passed`）。
 
 ### 已落地提交（按时间倒序）
 
+- `f5eec76` `refactor(api): align runs routes with shared error contracts`
+- `c69278b` `docs: refresh refactor progress after api contract consolidation`
 - `46c8ad5` `refactor(api): centralize shared route error contracts`
 - `995b3f4` `docs: sync claudecodeui refactor phase progress`
 - `6869242` `test(api): add negative contracts for project and session routes`
@@ -151,6 +153,6 @@
 
 ### 下一步（计划）
 
-- 继续 Phase 5：将 `stop`、`runs` 等关联入口接入共享错误契约，消除重复错误映射分支。
-- 补齐 Phase 5：针对 `stop`、`runs` 等关联入口增加最小负向合同断言，避免状态码语义漂移。
+- 继续 Phase 5：将 `approvals/terminal/tasks` 入口逐步接入共享错误契约，保持错误语义统一。
+- 补齐 Phase 5：为 `approvals/terminal/tasks` 增加最小负向合同断言，避免状态码漂移。
 - 启动 Phase 6：整理人工抽样回归清单（chat -> tools -> run -> approval 主链路）。
