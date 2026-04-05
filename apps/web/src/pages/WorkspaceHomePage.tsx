@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import type { RunRecord, SessionRecord } from "@shared";
+import type { RunRecord } from "@shared";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
+import { getSessionOriginHistoryLabel } from "../lib/sessionRuntime";
 import { EmptyState } from "../shared/ui/EmptyState";
 import { SectionHeader } from "../shared/ui/SectionHeader";
 
@@ -40,10 +41,6 @@ function getRunStatusToneClass(run: RunRecord | null): string {
   }
 
   return "state-success";
-}
-
-function getSessionOriginLabel(session: SessionRecord): string {
-  return session.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话";
 }
 
 export function WorkspaceHomePage(): JSX.Element {
@@ -154,7 +151,7 @@ export function WorkspaceHomePage(): JSX.Element {
                 <strong>当前会话</strong>
                 <p>
                   {selectedSession
-                    ? `${selectedSession.title} · ${selectedSession.provider} · ${getSessionOriginLabel(selectedSession)}`
+                    ? `${selectedSession.title} · ${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}`
                     : "还没有选中的会话，进入协作页后可以新建或切换会话。"}
                 </p>
               </div>
@@ -241,7 +238,7 @@ export function WorkspaceHomePage(): JSX.Element {
                   <strong>{session.title}</strong>
                   <span className="provider-chip">{session.provider}</span>
                 </div>
-                <p>{getSessionOriginLabel(session)}</p>
+                <p>{getSessionOriginHistoryLabel(session)}</p>
                 <span className="muted">
                   最近更新 {new Date(session.updatedAt).toLocaleString("zh-CN", { hour12: false })}
                 </span>

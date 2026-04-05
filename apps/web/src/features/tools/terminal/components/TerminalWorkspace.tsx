@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionRecord, TerminalSessionRecord } from "@shared";
 import { api } from "../../../../lib/api";
 import {
+  getSessionOriginRuntimeLabelByOrigin,
   getSessionResumeStatusLabel,
   getSessionStatusLabel
 } from "../../../../lib/sessionRuntime";
@@ -51,7 +52,7 @@ function getSourceSessionRuntimeLabel(
     return "项目终端";
   }
 
-  return sourceSession.origin === "imported_cli" ? "原生 CLI session" : "RelayDesk 托管会话";
+  return getSessionOriginRuntimeLabelByOrigin(sourceSession.origin);
 }
 
 function getTerminalBackendLabel(session: TerminalSessionRecord): string {

@@ -13,6 +13,7 @@ import type {
 import { PluginHostRuntime } from "../features/plugins/PluginHostRuntime";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
 import { api } from "../lib/api";
+import { getSessionOriginHistoryLabel } from "../lib/sessionRuntime";
 import { EmptyState } from "../shared/ui/EmptyState";
 import { SectionHeader } from "../shared/ui/SectionHeader";
 
@@ -602,7 +603,7 @@ function ProjectPulsePluginView({
           <h4>{selectedSession?.title ?? pluginContext.latestSessions[0]?.title ?? "还没有聚焦会话"}</h4>
           <p className="muted">
             {selectedSession
-              ? `${selectedSession.provider} · ${selectedSession.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话"}`
+              ? `${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}`
               : "当前未在宿主工作区选中会话，插件默认展示最近上下文。"}
           </p>
         </section>
@@ -634,7 +635,7 @@ function ProjectPulsePluginView({
                   <span className="plugin-badge">{session.provider}</span>
                 </div>
                 <p className="muted">
-                  {session.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话"} · 最近更新{" "}
+                  {getSessionOriginHistoryLabel(session)} · 最近更新{" "}
                   {new Date(session.updatedAt).toLocaleString("zh-CN", { hour12: false })}
                 </p>
               </article>
@@ -699,7 +700,7 @@ function DeliveryRadarPluginView({
               <article className="plugin-activity-card" key={session.id}>
                 <strong>{session.title}</strong>
                 <p className="muted">
-                  {session.provider} · {session.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话"}
+                  {session.provider} · {getSessionOriginHistoryLabel(session)}
                 </p>
               </article>
             ))}

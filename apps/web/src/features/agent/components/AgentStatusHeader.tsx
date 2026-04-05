@@ -2,6 +2,7 @@ import {
   canResumeImportedCliProvider,
   type SessionRecord
 } from "@shared";
+import { getSessionOriginHistoryLabel } from "../../../lib/sessionRuntime";
 import { SectionHeader } from "../../../shared/ui/SectionHeader";
 import { StatusPill } from "../../../shared/ui/StatusPill";
 
@@ -60,9 +61,9 @@ export function AgentStatusHeader({
   const description = selectedSession
     ? selectedSession.origin === "imported_cli"
       ? canRunImportedCliSession
-        ? `${selectedSession.title} · ${selectedSession.provider} · CLI 历史会话，可叠加替身`
-        : `${selectedSession.title} · ${selectedSession.provider} · CLI 历史会话，只读查看`
-      : `${selectedSession.title} · ${selectedSession.provider} · RelayDesk 会话`
+        ? `${selectedSession.title} · ${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}，可叠加替身`
+        : `${selectedSession.title} · ${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}，只读查看`
+      : `${selectedSession.title} · ${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}`
     : "先在协作模块中选择一条会话，再启动替身。";
 
   return (

@@ -3,6 +3,7 @@ import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import type { AuthUser } from "@shared";
 import type { SessionRecord } from "@shared";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
+import { getSessionOriginCreationLabel } from "../lib/sessionRuntime";
 import {
   MAX_PINNED_SESSION_COUNT,
   MAX_RECENT_COMMAND_COUNT,
@@ -199,7 +200,7 @@ export function ProjectLayout({ user }: ProjectLayoutProps): JSX.Element {
       ...sortedSessions.slice(0, 8).map((session) => ({
         id: `session-${session.id}`,
         title: `切换会话：${session.title}${pinnedSessionIdSet.has(session.id) ? "（已固定）" : ""}`,
-        subtitle: `${session.provider} · ${session.origin === "imported_cli" ? "CLI 导入" : "RelayDesk 创建"}`,
+        subtitle: `${session.provider} · ${getSessionOriginCreationLabel(session)}`,
         keywords: `${session.title} ${session.provider} ${session.origin} ${pinnedSessionIdSet.has(session.id) ? "pinned fixed" : ""}`,
         group: "session" as const,
         sortAt: getSessionActivityAt(session),

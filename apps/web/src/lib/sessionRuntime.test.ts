@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { SessionRecord } from "@shared";
 import {
   getSessionCapabilities,
+  getSessionOriginCreationLabel,
+  getSessionOriginHistoryLabel,
   getSessionOriginRuntimeLabel,
+  getSessionOriginRuntimeLabelByOrigin,
   getSessionResumeStatusLabel,
   getSessionRuntimeMode,
   getSessionStatusLabel
@@ -102,6 +105,20 @@ describe("sessionRuntime", () => {
         })
       )
     ).toBe("原生 CLI session");
+    expect(getSessionOriginHistoryLabel(createSession({ origin: "imported_cli" }))).toBe(
+      "CLI 历史会话"
+    );
+    expect(getSessionOriginHistoryLabel(createSession({ origin: "relaydesk" }))).toBe(
+      "RelayDesk 会话"
+    );
+    expect(getSessionOriginCreationLabel(createSession({ origin: "imported_cli" }))).toBe(
+      "CLI 导入"
+    );
+    expect(getSessionOriginCreationLabel(createSession({ origin: "relaydesk" }))).toBe(
+      "RelayDesk 创建"
+    );
+    expect(getSessionOriginRuntimeLabelByOrigin("imported_cli")).toBe("原生 CLI session");
+    expect(getSessionOriginRuntimeLabelByOrigin("relaydesk")).toBe("RelayDesk 托管会话");
   });
 
   it("returns resume and status labels", () => {

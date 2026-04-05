@@ -1,5 +1,8 @@
 import type { SessionRecord } from "@shared";
-import { getSessionCapabilities } from "../../../lib/sessionRuntime";
+import {
+  getSessionCapabilities,
+  getSessionOriginHistoryLabel
+} from "../../../lib/sessionRuntime";
 import { AgentStatusHeader } from "./AgentStatusHeader";
 
 interface RunControlPanelProps {
@@ -249,9 +252,7 @@ export function RunControlPanel({
             <strong>{selectedSession?.title ?? "未选择会话"}</strong>
             <p>
               {selectedSession
-                ? `${selectedSession.provider} · ${
-                    selectedSession.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话"
-                  }`
+                ? `${selectedSession.provider} · ${getSessionOriginHistoryLabel(selectedSession)}`
                 : "先进入协作模块选择一条会话，替身才能挂接到正确上下文上。"}
             </p>
           </article>

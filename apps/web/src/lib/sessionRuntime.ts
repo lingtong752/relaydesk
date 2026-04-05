@@ -49,6 +49,24 @@ export function getSessionRuntimeMode(session: SessionRecord | null): string {
   return session.runtimeMode ?? (session.origin === "imported_cli" ? "cli_session_mode" : "api_mode");
 }
 
+export function getSessionOriginHistoryLabel(
+  session: Pick<SessionRecord, "origin"> | null
+): string {
+  return session?.origin === "imported_cli" ? "CLI 历史会话" : "RelayDesk 会话";
+}
+
+export function getSessionOriginCreationLabel(
+  session: Pick<SessionRecord, "origin">
+): string {
+  return session.origin === "imported_cli" ? "CLI 导入" : "RelayDesk 创建";
+}
+
+export function getSessionOriginRuntimeLabelByOrigin(
+  origin: SessionRecord["origin"]
+): string {
+  return origin === "imported_cli" ? "原生 CLI session" : "RelayDesk 托管会话";
+}
+
 export function getSessionResumeStatusLabel(session: SessionRecord | null): string | null {
   if (!session?.lastResumeStatus) {
     return null;
@@ -73,10 +91,10 @@ export function getSessionResumeStatusLabel(session: SessionRecord | null): stri
 
 export function getSessionOriginRuntimeLabel(session: SessionRecord): string {
   if (getSessionRuntimeMode(session) === "cli_session_mode") {
-    return "原生 CLI session";
+    return getSessionOriginRuntimeLabelByOrigin("imported_cli");
   }
 
-  return "RelayDesk 托管会话";
+  return getSessionOriginRuntimeLabelByOrigin("relaydesk");
 }
 
 export function getSessionStatusLabel(session: SessionRecord | null): string {
