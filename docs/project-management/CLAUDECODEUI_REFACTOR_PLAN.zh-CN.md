@@ -132,6 +132,7 @@
 - 阶段产物：已新增 `docs/testing/TEST_REPORT-2026-04-05-CLAUDECODEUI-REFACTOR.md` 作为 Phase 6 回归基线。
 - 阶段产物：已新增 `docs/project-management/CLAUDECODEUI_REFACTOR_MERGE_NOTES.zh-CN.md` 作为合并审阅材料。
 - 阶段产物：已新增 `docs/project-management/CLAUDECODEUI_REFACTOR_PR_TEMPLATE.zh-CN.md` 作为 PR 提交流水线模板。
+- 阶段产物：新增 `npm run verify:claudecodeui-refactor` 一键复验命令（关键链路 `7 files / 29 tests`）。
 
 ### 已落地提交（按时间倒序）
 

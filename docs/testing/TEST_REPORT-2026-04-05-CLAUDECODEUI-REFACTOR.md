@@ -6,6 +6,8 @@
 - 范围：Phase 5（`projects/sessions/runs/approvals/terminal/tasks` 错误契约收敛 + 负向合同补齐）。
 - 自动化结果：`npm run lint`、`npm run typecheck`、`npm test` 全绿。
 - 最新全量测试：`55 files / 154 tests passed`。
+- 复验命令：`npm run verify:claudecodeui-refactor`（关键回归链路）。
+- 复验结果：`7 files / 29 tests passed`（`projects/sessions/runs/terminal/tasks + chat/tools`）。
 
 ## 本轮关键提交
 

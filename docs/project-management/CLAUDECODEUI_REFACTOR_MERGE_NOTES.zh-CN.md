@@ -40,6 +40,7 @@
   - `npm run lint` 通过。
   - `npm run typecheck` 通过。
   - `npm test` 通过（`55 files / 154 tests passed`）。
+  - `npm run verify:claudecodeui-refactor` 可一键复验关键链路。
 - 关键测试文件：
   - `apps/api/src/routes/projects.integration.test.ts`
   - `apps/api/src/routes/sessions.integration.test.ts`
