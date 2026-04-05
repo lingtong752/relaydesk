@@ -393,4 +393,93 @@ describe("run routes integration", () => {
       })
     );
   });
+
+  it("returns stable negative contracts for run creation and stop endpoints", async () => {
+    const registerResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        email: "run-negative-contracts@example.com",
+        password: "password123"
+      }
+    });
+    const registerBody = registerResponse.json() as { token: string };
+    const authHeader = { authorization: `Bearer ${registerBody.token}` };
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "Negative Contracts",
+        rootPath: "/workspace/negative-contracts"
+      }
+    });
+    const projectBody = projectResponse.json() as { project: { id: string } };
+
+    const invalidProjectRunResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects/not-an-object-id/runs",
+      headers: authHeader,
+      payload: {
+        sessionId: new ObjectId().toHexString(),
+        objective: "continue",
+        constraints: ""
+      }
+    });
+    expect(invalidProjectRunResponse.statusCode).toBe(400);
+    expect(invalidProjectRunResponse.json()).toEqual({
+      message: "Invalid payload"
+    });
+
+    const invalidSessionIdRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectBody.project.id}/runs`,
+      headers: authHeader,
+      payload: {
+        sessionId: "invalid-session-id",
+        objective: "continue",
+        constraints: ""
+      }
+    });
+    expect(invalidSessionIdRunResponse.statusCode).toBe(400);
+    expect(invalidSessionIdRunResponse.json()).toEqual({
+      message: "Invalid session id"
+    });
+
+    const missingSessionRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectBody.project.id}/runs`,
+      headers: authHeader,
+      payload: {
+        sessionId: new ObjectId().toHexString(),
+        objective: "continue",
+        constraints: ""
+      }
+    });
+    expect(missingSessionRunResponse.statusCode).toBe(404);
+    expect(missingSessionRunResponse.json()).toEqual({
+      message: "Session not found"
+    });
+
+    const invalidStopRunResponse = await app.inject({
+      method: "POST",
+      url: "/api/runs/not-an-object-id/stop",
+      headers: authHeader
+    });
+    expect(invalidStopRunResponse.statusCode).toBe(400);
+    expect(invalidStopRunResponse.json()).toEqual({
+      message: "Invalid run id"
+    });
+
+    const missingStopRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/runs/${new ObjectId().toHexString()}/stop`,
+      headers: authHeader
+    });
+    expect(missingStopRunResponse.statusCode).toBe(404);
+    expect(missingStopRunResponse.json()).toEqual({
+      message: "Run not found"
+    });
+  });
 });

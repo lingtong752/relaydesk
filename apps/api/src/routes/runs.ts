@@ -25,6 +25,7 @@ import {
   recordRunHistory,
   toRunIdentity
 } from "../services/runHistory.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 
 const createRunSchema = z.object({
   sessionId: z.string().min(1),
@@ -51,12 +52,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
       const parsedProjectId = parseObjectId(projectId);
 
       if (!parsedProjectId) {
-        return reply.code(400).send({ message: "Invalid project id" });
+        return sendRouteContractError(reply, "invalidProjectId");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const run = await app.db.collections.runs.findOne({
@@ -81,12 +82,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     const events = await listRunAuditEvents(app.db.collections, run._id!, parsedQuery.data.limit);
@@ -106,12 +107,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     const checkpoints = await listRunCheckpoints(
@@ -135,12 +136,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     if (["running", "waiting_human"].includes(run.status)) {
@@ -283,12 +284,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
       const parsedBody = createRunSchema.safeParse(request.body);
 
       if (!parsedProjectId || !parsedBody.success) {
-        return reply.code(400).send({ message: "Invalid payload" });
+        return sendRouteContractError(reply, "invalidPayload");
       }
 
       const project = await app.db.collections.projects.findOne({ _id: parsedProjectId, ownerId });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const existingRun = await app.db.collections.runs.findOne({
@@ -301,12 +302,12 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
 
       const sessionId = parseObjectId(parsedBody.data.sessionId);
       if (!sessionId) {
-        return reply.code(400).send({ message: "Invalid session id" });
+        return sendRouteContractError(reply, "invalidSessionId");
       }
 
       const session = await app.db.collections.sessions.findOne({ _id: sessionId, projectId: parsedProjectId });
       if (!session) {
-        return reply.code(404).send({ message: "Session not found" });
+        return sendRouteContractError(reply, "sessionNotFound");
       }
 
       if (session.origin === "imported_cli" && !app.cliSessionRunner.supportsImportedSession(session.provider)) {
@@ -409,17 +410,17 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
     const parsedRunId = parseObjectId(runId);
 
     if (!parsedRunId) {
-      return reply.code(400).send({ message: "Invalid run id" });
+      return sendRouteContractError(reply, "invalidRunId");
     }
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     app.streamRegistry.stopRun(run._id.toHexString());
@@ -476,17 +477,17 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
     const parsedRunId = parseObjectId(runId);
 
     if (!parsedRunId) {
-      return reply.code(400).send({ message: "Invalid run id" });
+      return sendRouteContractError(reply, "invalidRunId");
     }
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     if (!["running", "waiting_human"].includes(run.status)) {
@@ -568,17 +569,17 @@ export async function registerRunRoutes(app: FastifyInstance): Promise<void> {
     const parsedRunId = parseObjectId(runId);
 
     if (!parsedRunId) {
-      return reply.code(400).send({ message: "Invalid run id" });
+      return sendRouteContractError(reply, "invalidRunId");
     }
 
     const run = await app.db.collections.runs.findOne({ _id: parsedRunId });
     if (!run) {
-      return reply.code(404).send({ message: "Run not found" });
+      return sendRouteContractError(reply, "runNotFound");
     }
 
     const project = await app.db.collections.projects.findOne({ _id: run.projectId, ownerId });
     if (!project) {
-      return reply.code(404).send({ message: "Project not found" });
+      return sendRouteContractError(reply, "projectNotFound");
     }
 
     if (run.status !== "paused") {

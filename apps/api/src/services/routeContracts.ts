@@ -13,6 +13,10 @@ export const ROUTE_CONTRACT_ERRORS = {
     statusCode: 400,
     message: "Invalid session id"
   },
+  invalidRunId: {
+    statusCode: 400,
+    message: "Invalid run id"
+  },
   projectNotFound: {
     statusCode: 404,
     message: "Project not found"
@@ -20,6 +24,10 @@ export const ROUTE_CONTRACT_ERRORS = {
   sessionNotFound: {
     statusCode: 404,
     message: "Session not found"
+  },
+  runNotFound: {
+    statusCode: 404,
+    message: "Run not found"
   }
 } as const;
 

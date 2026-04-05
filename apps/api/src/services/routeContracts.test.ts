@@ -17,6 +17,10 @@ describe("routeContracts", () => {
         statusCode: 400,
         message: "Invalid session id"
       },
+      invalidRunId: {
+        statusCode: 400,
+        message: "Invalid run id"
+      },
       projectNotFound: {
         statusCode: 404,
         message: "Project not found"
@@ -24,6 +28,10 @@ describe("routeContracts", () => {
       sessionNotFound: {
         statusCode: 404,
         message: "Session not found"
+      },
+      runNotFound: {
+        statusCode: 404,
+        message: "Run not found"
       }
     });
   });
