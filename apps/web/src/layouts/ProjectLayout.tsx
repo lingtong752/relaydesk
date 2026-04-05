@@ -3,117 +3,28 @@ import { NavLink, Outlet, Link, useNavigate } from "react-router-dom";
 import type { AuthUser } from "@shared";
 import type { SessionRecord } from "@shared";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
+import {
+  MAX_PINNED_SESSION_COUNT,
+  MAX_RECENT_COMMAND_COUNT,
+  MAX_RECENT_COMMAND_GROUP_COUNT,
+  type CommandGroup,
+  type CommandPaletteItem,
+  type CommandPaletteScope,
+  type CommandPaletteSection,
+  type WorkbenchTab
+} from "./projectLayout/types";
+import {
+  getConnectionStatusLabel,
+  getGroupLabel,
+  getSessionActivityAt,
+  getStorageKey,
+  isEditableTarget,
+  persistIds,
+  readStoredIds
+} from "./projectLayout/utils";
 
 interface ProjectLayoutProps {
   user: AuthUser;
-}
-
-type WorkbenchTab = "chat" | "terminal" | "files" | "git";
-type CommandGroup = "workbench" | "session" | "project";
-type CommandPaletteScope = "all" | "session";
-const MAX_PINNED_SESSION_COUNT = 6;
-const MAX_RECENT_COMMAND_COUNT = 16;
-const MAX_RECENT_COMMAND_GROUP_COUNT = 5;
-
-interface CommandPaletteItem {
-  id: string;
-  title: string;
-  subtitle: string;
-  keywords: string;
-  group: CommandGroup;
-  sortAt?: number;
-  sessionId?: string;
-  execute(): void;
-}
-
-interface CommandPaletteSection {
-  id: string;
-  title: string;
-  items: CommandPaletteItem[];
-}
-
-function getConnectionStatusLabel(state: ReturnType<typeof useProjectWorkspace>["realtimeState"]): string {
-  if (state === "connected") {
-    return "实时连接正常";
-  }
-
-  if (state === "reconnecting") {
-    return "正在恢复实时连接";
-  }
-
-  if (state === "connecting") {
-    return "正在建立实时连接";
-  }
-
-  return "实时连接已断开";
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  if (target.isContentEditable) {
-    return true;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-  return tagName === "input" || tagName === "textarea" || tagName === "select";
-}
-
-function getSessionActivityAt(session: SessionRecord): number {
-  const timestamp = Date.parse(session.lastMessageAt ?? session.updatedAt ?? session.createdAt);
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function getGroupLabel(group: CommandGroup): string {
-  if (group === "workbench") {
-    return "工作台";
-  }
-
-  if (group === "session") {
-    return "会话";
-  }
-
-  return "项目";
-}
-
-function getStorageKey(projectId: string, field: "pinnedSessions" | "recentCommands"): string {
-  return `relaydesk.workspace.${projectId}.commandPalette.${field}`;
-}
-
-function readStoredIds(key: string): string[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(key);
-    if (!rawValue) {
-      return [];
-    }
-
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter((value): value is string => typeof value === "string");
-  } catch {
-    return [];
-  }
-}
-
-function persistIds(key: string, ids: string[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(key, JSON.stringify(ids));
-  } catch {
-    // localStorage may be unavailable in private mode or restricted environments.
-  }
 }
 
 export function ProjectLayout({ user }: ProjectLayoutProps): JSX.Element {
