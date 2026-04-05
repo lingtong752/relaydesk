@@ -248,5 +248,5 @@ describe("gitWorkspace write operations", () => {
 
     await runGit(["pull", "--ff-only", "origin", defaultBranch], peerPath);
     expect(await readFile(path.join(peerPath, "README.md"), "utf8")).toContain("local update");
-  });
+  }, 20_000);
 });

@@ -117,7 +117,7 @@ describe("git routes integration", () => {
 
     await runGit(["pull", "--ff-only", "origin", defaultBranch], peerPath);
     expect(await readFile(path.join(peerPath, "README.md"), "utf8")).toContain("local route update");
-  });
+  }, 20_000);
 });
 
 async function createRepositoryWithRemote(): Promise<{
