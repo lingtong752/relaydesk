@@ -127,11 +127,14 @@
 ## 执行进度（持续更新）
 
 - 时间：2026-04-05（当前分支：`codex-refactor-claudecodeui`）
-- 当前状态：Phase 0/1/2 已完成；Phase 3 进行中（已完成多刀结构与副作用拆分）；Phase 4/5 关键能力已部分前置完成。
-- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`。
+- 当前状态：Phase 0/1/2/3/4 已完成；Phase 5 进行中（已完成 `projects/sessions` 负向契约覆盖）。
+- 质量门禁：每刀后均通过 `npm run lint && npm run typecheck && npm test`（最新：`54 files / 148 tests passed`）。
 
 ### 已落地提交（按时间倒序）
 
+- `6869242` `test(api): add negative contracts for project and session routes`
+- `fc6f09c` `refactor(workspace): unify bound-session routing across chat and tools`
+- `41c510b` `docs: update claudecodeui refactor progress and next milestones`
 - `1968571` `refactor(web): centralize session origin labels in runtime helpers`
 - `b40f52a` `refactor(shared): centralize imported CLI resumable provider rules`
 - `d774c13` `refactor(chat): extract workspace chat page actions`
@@ -146,6 +149,6 @@
 
 ### 下一步（计划）
 
-- 继续 Phase 3：补齐 chat 域剩余组件的 view-model 与可复用状态转换函数。
-- 收口 Phase 4：统一 chat 与 files/terminal/git 绑定会话跳转策略的复用入口。
-- 收口 Phase 5：继续压缩路由层逻辑，补 `projects/sessions` 契约负例测试。
+- 继续 Phase 5：收敛 `projects/sessions` 路由层重复校验与错误映射，补共享错误契约 helper。
+- 补齐 Phase 5：针对 `stop`、`runs` 等关联入口增加最小负向合同断言，避免状态码语义漂移。
+- 启动 Phase 6：整理人工抽样回归清单（chat -> tools -> run -> approval 主链路）。
