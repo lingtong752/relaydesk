@@ -25,6 +25,7 @@ import {
   recordRunHistory,
   toRunIdentity
 } from "../services/runHistory.js";
+import { sendRouteContractError } from "../services/routeContracts.js";
 
 const updateTaskSchema = z.object({
   status: z.enum(["todo", "in_progress", "done", "blocked", "unknown"]).optional(),
@@ -78,7 +79,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (!parsedBody.success) {
-        return reply.code(400).send({ message: "Invalid payload" });
+        return sendRouteContractError(reply, "invalidPayload");
       }
 
       const projectRootPath = await resolveProjectRootPath(project.rootPath);
@@ -168,7 +169,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
         ownerId
       });
       if (!project) {
-        return reply.code(404).send({ message: "Project not found" });
+        return sendRouteContractError(reply, "projectNotFound");
       }
 
       const existingRun = await app.db.collections.runs.findOne({
@@ -181,12 +182,12 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
 
       const sessionId = parseObjectId(parsedBody.data.sessionId);
       if (!sessionId) {
-        return reply.code(400).send({ message: "Invalid session id" });
+        return sendRouteContractError(reply, "invalidSessionId");
       }
 
       const session = await app.db.collections.sessions.findOne({ _id: sessionId, projectId: parsedProjectId });
       if (!session) {
-        return reply.code(404).send({ message: "Session not found" });
+        return sendRouteContractError(reply, "sessionNotFound");
       }
 
       if (session.origin === "imported_cli" && !app.cliSessionRunner.supportsImportedSession(session.provider)) {
@@ -353,7 +354,7 @@ async function getOwnedProjectForTasks(
   const parsedProjectId = parseObjectId(projectId);
 
   if (!parsedProjectId) {
-    await reply.code(400).send({ message: "Invalid project id" });
+    sendRouteContractError(reply, "invalidProjectId");
     return null;
   }
 
@@ -362,7 +363,7 @@ async function getOwnedProjectForTasks(
     ownerId
   });
   if (!project) {
-    await reply.code(404).send({ message: "Project not found" });
+    sendRouteContractError(reply, "projectNotFound");
     return null;
   }
 

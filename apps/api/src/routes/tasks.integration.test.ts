@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
+import { ObjectId } from "mongodb";
 import { createApp } from "../app.js";
 import { createInMemoryDatabase } from "../testUtils/inMemoryDatabase.js";
 
@@ -496,6 +497,100 @@ describe("task routes integration", () => {
         })
       })
     );
+  });
+
+  it("returns stable negative contracts for task route guards and run bootstrap", async () => {
+    await mkdir(path.join(workspaceRoot, ".taskmaster", "tasks"), { recursive: true });
+    await writeFile(
+      path.join(workspaceRoot, ".taskmaster", "tasks", "tasks.json"),
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: "TASK-1",
+              title: "负向合同测试",
+              status: "todo"
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const authHeader = await registerAndAuthenticate(app);
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: authHeader,
+      payload: {
+        name: "tasks-negative-contracts",
+        rootPath: workspaceRoot
+      }
+    });
+    const projectId = (projectResponse.json() as { project: { id: string } }).project.id;
+
+    const invalidProjectTasksResponse = await app.inject({
+      method: "GET",
+      url: "/api/projects/not-an-object-id/tasks",
+      headers: authHeader
+    });
+    expect(invalidProjectTasksResponse.statusCode).toBe(400);
+    expect(invalidProjectTasksResponse.json()).toEqual({
+      message: "Invalid project id"
+    });
+
+    const missingProjectTasksResponse = await app.inject({
+      method: "GET",
+      url: `/api/projects/${new ObjectId().toHexString()}/tasks`,
+      headers: authHeader
+    });
+    expect(missingProjectTasksResponse.statusCode).toBe(404);
+    expect(missingProjectTasksResponse.json()).toEqual({
+      message: "Project not found"
+    });
+
+    const invalidPatchPayloadResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/projects/${projectId}/tasks/TASK-1`,
+      headers: authHeader,
+      payload: {
+        status: "unexpected"
+      }
+    });
+    expect(invalidPatchPayloadResponse.statusCode).toBe(400);
+    expect(invalidPatchPayloadResponse.json()).toEqual({
+      message: "Invalid payload"
+    });
+
+    const invalidSessionIdStartRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/tasks/TASK-1/start-run`,
+      headers: authHeader,
+      payload: {
+        sessionId: "invalid-session-id",
+        constraints: ""
+      }
+    });
+    expect(invalidSessionIdStartRunResponse.statusCode).toBe(400);
+    expect(invalidSessionIdStartRunResponse.json()).toEqual({
+      message: "Invalid session id"
+    });
+
+    const missingSessionStartRunResponse = await app.inject({
+      method: "POST",
+      url: `/api/projects/${projectId}/tasks/TASK-1/start-run`,
+      headers: authHeader,
+      payload: {
+        sessionId: new ObjectId().toHexString(),
+        constraints: ""
+      }
+    });
+    expect(missingSessionStartRunResponse.statusCode).toBe(404);
+    expect(missingSessionStartRunResponse.json()).toEqual({
+      message: "Session not found"
+    });
   });
 });
 
