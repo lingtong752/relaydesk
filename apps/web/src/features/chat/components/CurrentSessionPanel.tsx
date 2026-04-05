@@ -2,11 +2,7 @@ import type { SessionRecord, MessageRecord } from "@shared";
 import { MessageComposer } from "./MessageComposer";
 import { MessageList } from "./MessageList";
 import { SectionHeader } from "../../../shared/ui/SectionHeader";
-import {
-  getSessionCapabilities,
-  getSessionOriginRuntimeLabel,
-  getSessionResumeStatusLabel
-} from "../../../lib/sessionRuntime";
+import { buildCurrentSessionPanelViewModel } from "./currentSessionPanel/viewModel";
 
 interface CurrentSessionPanelProps {
   combinedError: string | null;
@@ -35,9 +31,10 @@ export function CurrentSessionPanel({
   onStopSession,
   onSubmit
 }: CurrentSessionPanelProps): JSX.Element {
-  const isImportedCliSession = selectedSession?.origin === "imported_cli";
-  const sessionCapabilities = getSessionCapabilities(selectedSession);
-  const sessionResumeLabel = getSessionResumeStatusLabel(selectedSession);
+  const viewModel = buildCurrentSessionPanelViewModel({
+    selectedSession,
+    stoppingSession
+  });
 
   return (
     <section className="chat-panel">
@@ -46,7 +43,7 @@ export function CurrentSessionPanel({
           <div className="section-actions">
             <button
               className="secondary-button"
-              disabled={!selectedSession}
+              disabled={viewModel.openActionsDisabled}
               onClick={onOpenFiles}
               type="button"
             >
@@ -54,7 +51,7 @@ export function CurrentSessionPanel({
             </button>
             <button
               className="secondary-button"
-              disabled={!selectedSession}
+              disabled={viewModel.openActionsDisabled}
               onClick={onOpenGit}
               type="button"
             >
@@ -62,7 +59,7 @@ export function CurrentSessionPanel({
             </button>
             <button
               className="secondary-button"
-              disabled={!selectedSession || !sessionCapabilities.canAttachTerminal}
+              disabled={viewModel.openTerminalDisabled}
               onClick={onOpenTerminal}
               type="button"
             >
@@ -70,11 +67,7 @@ export function CurrentSessionPanel({
             </button>
             <button
               className="secondary-button"
-              disabled={
-                !selectedSession ||
-                stoppingSession ||
-                (isImportedCliSession && !sessionCapabilities.canSendMessages)
-              }
+              disabled={viewModel.stopButtonDisabled}
               onClick={onStopSession}
               type="button"
             >
@@ -82,44 +75,21 @@ export function CurrentSessionPanel({
             </button>
           </div>
         }
-        description={
-          selectedSession
-            ? `Provider: ${selectedSession.provider} · ${getSessionOriginRuntimeLabel(selectedSession)}`
-            : undefined
-        }
+        description={viewModel.sessionDescription}
         eyebrow="当前会话"
         title={selectedSession?.title ?? "请选择会话"}
       />
 
       {combinedError ? <div className="error-box">{combinedError}</div> : null}
-      {selectedSession ? (
-        <div className="info-box">
-          当前会话工作区：{selectedSession.sourcePath ?? "使用项目根路径"}。
-          {sessionCapabilities.canAttachTerminal
-            ? " 可以从这里直接打开绑定终端，保持同一条 session 的上下文。"
-            : " 当前还不能附着终端。"}
-        </div>
-      ) : null}
-      {isImportedCliSession ? (
-        <div className="info-box">
-          {sessionCapabilities.canSendMessages
-            ? "这条会话来自本机 CLI 历史记录，当前已经支持继续发送；后续会继续把它打磨成真正的一等 session 工作台。"
-            : "这条会话来自本机 CLI 历史记录，当前仍处于只读观察模式。"}
-          {sessionResumeLabel ? ` ${sessionResumeLabel}。` : ""}
-        </div>
-      ) : sessionResumeLabel ? <div className="info-box">{sessionResumeLabel}</div> : null}
+      {viewModel.workspaceInfoMessage ? <div className="info-box">{viewModel.workspaceInfoMessage}</div> : null}
+      {viewModel.importedInfoMessage ? <div className="info-box">{viewModel.importedInfoMessage}</div> : null}
+      {viewModel.resumeInfoMessage ? <div className="info-box">{viewModel.resumeInfoMessage}</div> : null}
 
       <MessageList messages={messages} />
       <MessageComposer
-        disabled={!selectedSession || !sessionCapabilities.canSendMessages}
+        disabled={viewModel.composerDisabled}
         messageDraft={messageDraft}
-        placeholder={
-          isImportedCliSession
-            ? sessionCapabilities.canSendMessages
-              ? "继续对这条本机 CLI 会话发送消息"
-              : "这个 CLI provider 当前仍是只读，后续会接入继续发送"
-            : "输入你要交给 Agent 的任务"
-        }
+        placeholder={viewModel.composerPlaceholder}
         onDraftChange={onDraftChange}
         onSubmit={onSubmit}
       />
