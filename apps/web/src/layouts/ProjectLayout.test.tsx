@@ -129,4 +129,34 @@ describe("ProjectLayout", () => {
     expect(markup).toContain("较早会话");
     expect(markup.indexOf("最新会话")).toBeLessThan(markup.indexOf("较早会话"));
   });
+
+  it("preserves selected session id in workbench navigation links", () => {
+    vi.mocked(useProjectWorkspace).mockReturnValue(createWorkspaceContext());
+
+    const markup = renderToStaticMarkup(
+      <StaticRouter location="/workspace/project-demo/chat?sessionId=session-new">
+        <Routes>
+          <Route
+            element={
+              <ProjectLayout
+                user={{
+                  id: "user-demo",
+                  email: "demo@relaydesk.dev",
+                  createdAt: "2026-04-03T07:00:00.000Z"
+                }}
+              />
+            }
+            path="/workspace/:projectId"
+          >
+            <Route element={<div>chat-route</div>} path="chat" />
+          </Route>
+        </Routes>
+      </StaticRouter>
+    );
+
+    expect(markup).toContain('href="/workspace/project-demo/chat?sessionId=session-new"');
+    expect(markup).toContain('href="/workspace/project-demo/tools/terminal?sessionId=session-new"');
+    expect(markup).toContain('href="/workspace/project-demo/tools/files?sessionId=session-new"');
+    expect(markup).toContain('href="/workspace/project-demo/tools/git?sessionId=session-new"');
+  });
 });
