@@ -23,6 +23,7 @@
 
 - PRD：[prd/PRODUCT_REQUIREMENTS.zh-CN.md](./prd/PRODUCT_REQUIREMENTS.zh-CN.md)
 - 测试报告：[testing/TEST_REPORT-2026-03-28.md](./testing/TEST_REPORT-2026-03-28.md)
+- 重构回归报告（2026-04-05）：[testing/TEST_REPORT-2026-04-05-CLAUDECODEUI-REFACTOR.md](./testing/TEST_REPORT-2026-04-05-CLAUDECODEUI-REFACTOR.md)
 - 路线图：[project-management/ROADMAP.zh-CN.md](./project-management/ROADMAP.zh-CN.md)
 - 开发待办：[project-management/BACKLOG.zh-CN.md](./project-management/BACKLOG.zh-CN.md)
 - CLI session 与插件平台计划：[project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md](./project-management/CLI_SESSION_PLUGIN_PLAN.zh-CN.md)
