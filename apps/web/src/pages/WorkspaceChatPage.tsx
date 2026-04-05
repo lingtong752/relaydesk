@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { CurrentSessionPanel } from "../features/chat/components/CurrentSessionPanel";
 import { SessionListPanel } from "../features/chat/components/SessionListPanel";
 import { useSessionMessages } from "../features/chat/useSessionMessages";
+import {
+  buildSessionCountLabel,
+  createSessionWithLoadingState,
+  navigateToWorkspaceTool,
+  selectSessionWithCleanup,
+  stopSessionOutput,
+  submitSessionMessage
+} from "../features/chat/workspaceChatPageActions";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
 
 export function WorkspaceChatPage(): JSX.Element {
@@ -45,52 +53,55 @@ export function WorkspaceChatPage(): JSX.Element {
   });
 
   const combinedError = pageError ?? workspaceError;
-  const sessionCountLabel = useMemo(() => `${sessions.length} 个会话`, [sessions.length]);
+  const sessionCountLabel = useMemo(
+    () => buildSessionCountLabel(sessions.length),
+    [sessions.length]
+  );
 
   async function handleCreateSession(): Promise<void> {
-    clearChatError();
-    setCreatingSession(true);
-    try {
-      await createSession();
-    } finally {
-      setCreatingSession(false);
-    }
+    await createSessionWithLoadingState({
+      clearChatError,
+      setCreatingSession,
+      createSession
+    });
   }
 
   async function handleSendMessage(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    await sendMessage();
+    await submitSessionMessage({
+      event,
+      sendMessage
+    });
   }
 
   async function handleStopSession(): Promise<void> {
-    await stopSession();
+    await stopSessionOutput({ stopSession });
   }
 
   function handleOpenTerminal(): void {
-    if (!selectedSession) {
-      return;
-    }
-
-    const query = new URLSearchParams({ sessionId: selectedSession.id });
-    navigate(`/workspace/${projectId}/tools/terminal?${query.toString()}`);
+    navigateToWorkspaceTool({
+      projectId,
+      selectedSession,
+      tool: "terminal",
+      navigate
+    });
   }
 
   function handleOpenFiles(): void {
-    if (!selectedSession) {
-      return;
-    }
-
-    const query = new URLSearchParams({ sessionId: selectedSession.id });
-    navigate(`/workspace/${projectId}/tools/files?${query.toString()}`);
+    navigateToWorkspaceTool({
+      projectId,
+      selectedSession,
+      tool: "files",
+      navigate
+    });
   }
 
   function handleOpenGit(): void {
-    if (!selectedSession) {
-      return;
-    }
-
-    const query = new URLSearchParams({ sessionId: selectedSession.id });
-    navigate(`/workspace/${projectId}/tools/git?${query.toString()}`);
+    navigateToWorkspaceTool({
+      projectId,
+      selectedSession,
+      tool: "git",
+      navigate
+    });
   }
 
   return (
@@ -101,10 +112,13 @@ export function WorkspaceChatPage(): JSX.Element {
         onCreateSession={() => void handleCreateSession()}
         onOpenProjects={() => navigate("/projects")}
         onProviderChange={setNewSessionProvider}
-        onSelectSession={(sessionId) => {
-          clearChatError();
-          selectSession(sessionId);
-        }}
+        onSelectSession={(sessionId) =>
+          selectSessionWithCleanup({
+            sessionId,
+            clearChatError,
+            selectSession
+          })
+        }
         projectName={projectName}
         projectRootPath={projectRootPath}
         selectedSessionId={selectedSessionId}
