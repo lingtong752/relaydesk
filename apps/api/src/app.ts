@@ -24,6 +24,7 @@ import { LocalCliSessionRunner, type CliSessionRunner } from "./services/cliSess
 import { StreamRegistry } from "./services/mockStreams.js";
 import { TerminalManager, TerminalManagerError } from "./services/terminalManager.js";
 import { SessionHub } from "./ws/sessionHub.js";
+import { createInMemoryDatabase } from "./testUtils/inMemoryDatabase.js";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
@@ -76,10 +77,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
   const app = Fastify({ logger: options.logger ?? true });
   const db = options.db
     ? options.db
-    : await (async () => {
-        const dbConfig = getDatabaseEnv();
-        return connectDatabase(dbConfig.MONGODB_URI, dbConfig.MONGODB_DB);
-      })();
+    : env.USE_IN_MEMORY_DB
+      ? createInMemoryDatabase()
+      : await (async () => {
+          const dbConfig = getDatabaseEnv();
+          return connectDatabase(dbConfig.MONGODB_URI, dbConfig.MONGODB_DB);
+        })();
   const shouldCloseDb = !options.db;
   const hub = new SessionHub();
   const streamRegistry = new StreamRegistry();

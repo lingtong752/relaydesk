@@ -16,6 +16,7 @@ import type {
   PluginInstallationRecord,
   PluginPreviewDiffRecord,
   PluginRpcExecutionRecord,
+  ProjectBootstrapRecord,
   ProjectTaskBoardRecord,
   ProjectTaskRecord,
   ProjectSettingsUpdateInput,
@@ -116,13 +117,7 @@ export const api = {
   getProjectBootstrap(
     token: string,
     projectId: string
-  ): Promise<{
-    project: ProjectRecord;
-    sessions: SessionRecord[];
-    activeRun: RunRecord | null;
-    latestRun: RunRecord | null;
-    pendingApprovals: ApprovalRecord[];
-  }> {
+  ): Promise<ProjectBootstrapRecord> {
     return request(`/api/projects/${projectId}/bootstrap`, { token });
   },
   getProjectSettings(token: string, projectId: string): Promise<{ settings: ProjectSettingsSummary }> {

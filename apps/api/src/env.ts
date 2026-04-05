@@ -7,6 +7,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(currentDir, "../../../.env") });
 
 const envSchema = z.object({
+  USE_IN_MEMORY_DB: z.coerce.boolean().default(false),
   MONGODB_URI: z.string().min(1).optional(),
   MONGODB_DB: z.string().min(1).optional(),
   JWT_SECRET: z.string().min(8).optional(),

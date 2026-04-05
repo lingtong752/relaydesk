@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { Route, Routes } from "react-router-dom";
 import { StaticRouter } from "react-router-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useProjectWorkspace } from "../features/workspace/useProjectWorkspace";
-import { WorkspaceHomePage } from "./WorkspaceHomePage";
+import { ProjectLayout } from "./ProjectLayout";
 
 vi.mock("../features/workspace/useProjectWorkspace", () => ({
   useProjectWorkspace: vi.fn()
@@ -13,38 +14,38 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
     projectId: "project-demo",
     token: "token-demo",
     projectName: "RelayDesk Demo",
-    projectRootPath: "/tmp/relaydesk",
+    projectRootPath: "/tmp/relaydesk-demo",
     sessions: [
       {
-        id: "session-1",
+        id: "session-new",
         projectId: "project-demo",
-        title: "设计改版会话",
+        title: "最新会话",
         provider: "codex",
         origin: "relaydesk",
         status: "idle",
-        createdAt: "2026-03-28T10:00:00.000Z",
-        updatedAt: "2026-03-28T10:05:00.000Z"
+        createdAt: "2026-04-03T10:00:00.000Z",
+        updatedAt: "2026-04-03T12:00:00.000Z"
       },
       {
-        id: "session-2",
+        id: "session-old",
         projectId: "project-demo",
-        title: "CLI 导入会话",
+        title: "较早会话",
         provider: "claude",
         origin: "imported_cli",
         status: "idle",
-        createdAt: "2026-03-28T09:00:00.000Z",
-        updatedAt: "2026-03-28T09:30:00.000Z"
+        createdAt: "2026-04-03T08:00:00.000Z",
+        updatedAt: "2026-04-03T09:00:00.000Z"
       }
     ],
-    activeSessionId: "session-1",
+    activeSessionId: "session-new",
     sessionCapabilities: {
-      "session-1": {
+      "session-new": {
         canSendMessages: true,
         canResume: false,
         canStartRuns: true,
         canAttachTerminal: true
       },
-      "session-2": {
+      "session-old": {
         canSendMessages: false,
         canResume: false,
         canStartRuns: false,
@@ -52,43 +53,21 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
       }
     },
     recentSessionAuditEvents: [],
-    selectedSessionId: "session-1",
+    selectedSessionId: "session-new",
     selectedSession: {
-      id: "session-1",
+      id: "session-new",
       projectId: "project-demo",
-      title: "设计改版会话",
+      title: "最新会话",
       provider: "codex",
       origin: "relaydesk",
       status: "idle",
-      createdAt: "2026-03-28T10:00:00.000Z",
-      updatedAt: "2026-03-28T10:05:00.000Z"
+      createdAt: "2026-04-03T10:00:00.000Z",
+      updatedAt: "2026-04-03T12:00:00.000Z"
     },
     newSessionProvider: "codex",
-    activeRun: {
-      id: "run-1",
-      projectId: "project-demo",
-      sessionId: "session-1",
-      provider: "codex",
-      objective: "统一首页与左侧菜单",
-      constraints: "保持导航清晰",
-      status: "waiting_human",
-      startedAt: "2026-03-28T10:10:00.000Z",
-      updatedAt: "2026-03-28T10:15:00.000Z"
-    },
+    activeRun: null,
     latestRun: null,
-    pendingApprovals: [
-      {
-        id: "approval-1",
-        projectId: "project-demo",
-        sessionId: "session-1",
-        runId: "run-1",
-        title: "需要审批",
-        reason: "准备调整导航层级",
-        status: "pending",
-        createdAt: "2026-03-28T10:16:00.000Z",
-        updatedAt: "2026-03-28T10:16:00.000Z"
-      }
-    ],
+    pendingApprovals: [],
     realtimeState: "connected",
     reconnectVersion: 0,
     wsClient: null,
@@ -110,27 +89,44 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
   } as ReturnType<typeof useProjectWorkspace>;
 }
 
-describe("WorkspaceHomePage", () => {
+describe("ProjectLayout", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders workspace overview, quick actions, and recent sessions", () => {
+  it("renders top workbench navigation and recent sessions in activity order", () => {
     vi.mocked(useProjectWorkspace).mockReturnValue(createWorkspaceContext());
 
     const markup = renderToStaticMarkup(
-      <StaticRouter location="/workspace/project-demo/home">
-        <WorkspaceHomePage />
+      <StaticRouter location="/workspace/project-demo/chat">
+        <Routes>
+          <Route
+            element={
+              <ProjectLayout
+                user={{
+                  id: "user-demo",
+                  email: "demo@relaydesk.dev",
+                  createdAt: "2026-04-03T07:00:00.000Z"
+                }}
+              />
+            }
+            path="/workspace/:projectId"
+          >
+            <Route element={<div>chat-route</div>} path="chat" />
+          </Route>
+        </Routes>
       </StaticRouter>
     );
 
-    expect(markup).toContain("先看状态，再决定下一步动作");
-    expect(markup).toContain("会话总数");
-    expect(markup).toContain("待审批项");
-    expect(markup).toContain("等待人工");
-    expect(markup).toContain("设计改版会话");
-    expect(markup).toContain("CLI 导入会话");
-    expect(markup).toContain("按模块继续推进");
-    expect(markup).toContain("工作区工具");
+    expect(markup).toContain("Chat");
+    expect(markup).toContain("Shell");
+    expect(markup).toContain("Files");
+    expect(markup).toContain("Source Control");
+    expect(markup).toContain("命令面板");
+    expect(markup).toContain("最近会话");
+    expect(markup).toContain("固定");
+    expect(markup).toContain("最新会话");
+    expect(markup).toContain("较早会话");
+    expect(markup.indexOf("最新会话")).toBeLessThan(markup.indexOf("较早会话"));
   });
 });

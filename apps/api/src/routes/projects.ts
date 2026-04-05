@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import type { DiscoveredProjectRecord, ProjectRecord } from "@shared";
 import { getAuthUser } from "../auth.js";
-import { serializeApproval, serializeProject, serializeRun } from "../db.js";
+import { serializeApproval, serializeAuditEvent, serializeProject, serializeRun } from "../db.js";
 import { discoverLocalProjects } from "../services/projectDiscovery.js";
 import {
   findDiscoveredProjectByRoot,
@@ -15,6 +15,27 @@ import {
   resolveProjectRootPath
 } from "../services/projectRoot.js";
 import { serializeWorkspaceSession } from "../services/sessionRecords.js";
+
+function resolveActiveSessionId(input: {
+  sessions: Array<{ id: string; status: string }>;
+  activeRunSessionId: string | null;
+}): string | null {
+  if (input.activeRunSessionId && input.sessions.some((session) => session.id === input.activeRunSessionId)) {
+    return input.activeRunSessionId;
+  }
+
+  const reconnectingSession = input.sessions.find((session) => session.status === "reconnecting");
+  if (reconnectingSession) {
+    return reconnectingSession.id;
+  }
+
+  const runningSession = input.sessions.find((session) => session.status === "running");
+  if (runningSession) {
+    return runningSession.id;
+  }
+
+  return input.sessions[0]?.id ?? null;
+}
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(1),
@@ -175,6 +196,34 @@ export async function registerProjectRoutes(
           .sort({ createdAt: -1 })
           .toArray()
       ]);
+      const workspaceSessions = sessions.map((session) =>
+        serializeWorkspaceSession(session, app.cliSessionRunner)
+      );
+      const activeSessionId = resolveActiveSessionId({
+        sessions: workspaceSessions,
+        activeRunSessionId: activeRun?.sessionId?.toHexString() ?? null
+      });
+      const sessionCapabilities = Object.fromEntries(
+        workspaceSessions.map((session) => [
+          session.id,
+          session.capabilities ?? {
+            canSendMessages: false,
+            canResume: false,
+            canStartRuns: false,
+            canAttachTerminal: false
+          }
+        ])
+      );
+      const recentSessionAuditEvents = activeSessionId
+        ? await app.db.collections.auditEvents
+            .find({
+              projectId: project._id!,
+              sessionId: new ObjectId(activeSessionId)
+            })
+            .sort({ createdAt: -1 })
+            .limit(12)
+            .toArray()
+        : [];
 
       const resolvedRootPath = await resolveProjectRootPath(project.rootPath);
 
@@ -183,7 +232,10 @@ export async function registerProjectRoutes(
           ...serializeProject(project),
           rootPath: resolvedRootPath
         },
-        sessions: sessions.map((session) => serializeWorkspaceSession(session, app.cliSessionRunner)),
+        sessions: workspaceSessions,
+        activeSessionId,
+        sessionCapabilities,
+        recentSessionAuditEvents: recentSessionAuditEvents.map(serializeAuditEvent),
         activeRun: activeRun ? serializeRun(activeRun) : null,
         latestRun: latestRuns[0] ? serializeRun(latestRuns[0]) : null,
         pendingApprovals: pendingApprovals.map(serializeApproval)

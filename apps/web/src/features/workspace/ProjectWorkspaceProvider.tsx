@@ -1,6 +1,13 @@
 import { createContext, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
-import type { ApprovalRecord, RealtimeEvent, RunRecord, SessionRecord } from "@shared";
+import type {
+  ApprovalRecord,
+  AuditEventRecord,
+  RealtimeEvent,
+  RunRecord,
+  SessionCapabilitiesMapRecord,
+  SessionRecord
+} from "@shared";
 import { api, authStorage } from "../../lib/api";
 import type { RealtimeClient, RealtimeConnectionState } from "../../lib/ws";
 import { useProjectBootstrap } from "./useProjectBootstrap";
@@ -12,6 +19,9 @@ export interface ProjectWorkspaceContextValue {
   projectName: string;
   projectRootPath: string;
   sessions: SessionRecord[];
+  activeSessionId: string;
+  sessionCapabilities: SessionCapabilitiesMapRecord;
+  recentSessionAuditEvents: AuditEventRecord[];
   selectedSessionId: string;
   selectedSession: SessionRecord | null;
   newSessionProvider: SessionRecord["provider"];
@@ -53,6 +63,9 @@ export function ProjectWorkspaceProvider({
     projectName,
     projectRootPath,
     sessions,
+    activeSessionId,
+    sessionCapabilities,
+    recentSessionAuditEvents,
     selectedSessionId,
     selectedSession,
     activeRun,
@@ -221,6 +234,9 @@ export function ProjectWorkspaceProvider({
         projectName,
         projectRootPath,
         sessions,
+        activeSessionId,
+        sessionCapabilities,
+        recentSessionAuditEvents,
         selectedSessionId,
         selectedSession,
         newSessionProvider,

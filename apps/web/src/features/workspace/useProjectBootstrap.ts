@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import type { ApprovalRecord, RunRecord, SessionRecord } from "@shared";
+import type {
+  ApprovalRecord,
+  AuditEventRecord,
+  RunRecord,
+  SessionCapabilitiesMapRecord,
+  SessionRecord
+} from "@shared";
 import { api } from "../../lib/api";
 
 function mergePendingApprovals(
@@ -26,6 +32,9 @@ export interface ProjectBootstrapState {
   projectName: string;
   projectRootPath: string;
   sessions: SessionRecord[];
+  activeSessionId: string;
+  sessionCapabilities: SessionCapabilitiesMapRecord;
+  recentSessionAuditEvents: AuditEventRecord[];
   selectedSessionId: string;
   selectedSession: SessionRecord | null;
   activeRun: RunRecord | null;
@@ -49,6 +58,9 @@ export function useProjectBootstrap({
   const [projectName, setProjectName] = useState("项目控制台");
   const [projectRootPath, setProjectRootPath] = useState("");
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState("");
+  const [sessionCapabilities, setSessionCapabilities] = useState<SessionCapabilitiesMapRecord>({});
+  const [recentSessionAuditEvents, setRecentSessionAuditEvents] = useState<AuditEventRecord[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [activeRun, setActiveRun] = useState<RunRecord | null>(null);
   const [latestRun, setLatestRun] = useState<RunRecord | null>(null);
@@ -84,6 +96,9 @@ export function useProjectBootstrap({
       setProjectName("项目控制台");
       setProjectRootPath("");
       setSessions([]);
+      setActiveSessionId("");
+      setSessionCapabilities({});
+      setRecentSessionAuditEvents([]);
       setSelectedSessionId("");
       setActiveRun(null);
       setLatestRun(null);
@@ -99,6 +114,9 @@ export function useProjectBootstrap({
     setProjectName("项目控制台");
     setProjectRootPath("");
     setSessions([]);
+    setActiveSessionId("");
+    setSessionCapabilities({});
+    setRecentSessionAuditEvents([]);
     setSelectedSessionId("");
     setActiveRun(null);
     setLatestRun(null);
@@ -114,10 +132,20 @@ export function useProjectBootstrap({
         setProjectName(response.project.name);
         setProjectRootPath(response.project.rootPath);
         setSessions(response.sessions);
+        setActiveSessionId(response.activeSessionId ?? "");
+        setSessionCapabilities(response.sessionCapabilities);
+        setRecentSessionAuditEvents(response.recentSessionAuditEvents);
         setActiveRun(response.activeRun);
         setLatestRun(response.latestRun ?? response.activeRun);
         setPendingApprovals(response.pendingApprovals);
         setSelectedSessionId((current) => {
+          if (
+            response.activeSessionId &&
+            response.sessions.some((session) => session.id === response.activeSessionId)
+          ) {
+            return response.activeSessionId;
+          }
+
           if (current && response.sessions.some((session) => session.id === current)) {
             return current;
           }
@@ -146,6 +174,9 @@ export function useProjectBootstrap({
     projectName,
     projectRootPath,
     sessions,
+    activeSessionId,
+    sessionCapabilities,
+    recentSessionAuditEvents,
     selectedSessionId,
     selectedSession,
     activeRun,

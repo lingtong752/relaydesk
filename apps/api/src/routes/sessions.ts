@@ -192,7 +192,13 @@ export async function registerSessionRoutes(app: FastifyInstance): Promise<void>
 
       await app.db.collections.sessions.updateOne(
         { _id: session._id },
-        { $set: { status: "running", updatedAt: now, lastMessageAt: now } }
+        {
+          $set: {
+            status: session.origin === "imported_cli" ? "reconnecting" : "running",
+            updatedAt: now,
+            lastMessageAt: now
+          }
+        }
       );
 
       app.hub.publish(`session:${session._id.toHexString()}`, {

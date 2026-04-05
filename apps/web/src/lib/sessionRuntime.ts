@@ -74,6 +74,14 @@ export function getSessionStatusLabel(session: SessionRecord | null): string {
     return "运行中";
   }
 
+  if (session.status === "reconnecting") {
+    return "恢复中";
+  }
+
+  if (session.status === "failed") {
+    return "失败";
+  }
+
   if (session.status === "stopped") {
     return "已停止";
   }

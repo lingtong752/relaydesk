@@ -114,6 +114,7 @@ async function markImportedSessionResumeAttempt(input: {
     { _id: input.sessionId },
     {
       $set: {
+        status: "reconnecting",
         lastResumeAttemptAt: input.attemptAt,
         lastResumeError: null
       }
@@ -218,7 +219,7 @@ export async function streamProviderMessage(input: {
     );
     await collections.sessions.updateOne(
       { _id: sessionId },
-      { $set: { status: isAborted ? "stopped" : "stopped", updatedAt } }
+      { $set: { status: isAborted ? "stopped" : "failed", updatedAt } }
     );
     const failedMessage = await collections.messages.findOne({ _id: providerMessage._id });
     if (failedMessage) {
@@ -381,7 +382,7 @@ export async function streamImportedCliSessionMessage(input: {
       sessionId: session._id!,
       attemptAt,
       updatedAt,
-      status: "stopped",
+      status: isAborted ? "stopped" : "failed",
       result: isAborted ? "aborted" : "failed",
       errorMessage: isAborted ? null : message
     });
@@ -492,6 +493,7 @@ export async function streamSurrogateRun(input: {
         sessionId: session._id!,
         attemptAt,
         updatedAt: new Date(),
+        status: "running",
         result: "succeeded",
         externalSessionId: result.externalSessionId
       });
@@ -553,6 +555,7 @@ export async function streamSurrogateRun(input: {
         sessionId: run.sessionId,
         attemptAt: session.lastResumeAttemptAt ?? updatedAt,
         updatedAt,
+        status: isAborted ? "stopped" : "failed",
         result: isAborted ? "aborted" : "failed",
         errorMessage: isAborted ? null : message
       });

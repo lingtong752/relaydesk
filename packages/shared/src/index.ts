@@ -1,6 +1,7 @@
 export type ProviderId = "mock" | "claude" | "codex" | "cursor" | "gemini";
 export type SessionRuntimeMode = "api_mode" | "cli_session_mode";
 export type SessionResumeStatus = "succeeded" | "failed" | "aborted";
+export type SessionStatus = "idle" | "running" | "reconnecting" | "stopped" | "failed";
 
 export type MessageRole = "human" | "surrogate" | "provider" | "system" | "tool";
 export type MessageStatus = "pending" | "streaming" | "completed" | "stopped" | "failed";
@@ -270,13 +271,8 @@ export interface SessionRecord {
   externalSessionId?: string;
   sourcePath?: string;
   runtimeMode?: SessionRuntimeMode;
-  capabilities?: {
-    canSendMessages: boolean;
-    canResume: boolean;
-    canStartRuns: boolean;
-    canAttachTerminal: boolean;
-  };
-  status: "idle" | "running" | "stopped";
+  capabilities?: SessionCapabilitiesRecord;
+  status: SessionStatus;
   lastResumeAttemptAt?: string;
   lastResumedAt?: string;
   lastResumeStatus?: SessionResumeStatus;
@@ -285,6 +281,15 @@ export interface SessionRecord {
   updatedAt: string;
   lastMessageAt?: string;
 }
+
+export interface SessionCapabilitiesRecord {
+  canSendMessages: boolean;
+  canResume: boolean;
+  canStartRuns: boolean;
+  canAttachTerminal: boolean;
+}
+
+export type SessionCapabilitiesMapRecord = Record<string, SessionCapabilitiesRecord>;
 
 export interface MessageRecord {
   id: string;
@@ -310,6 +315,17 @@ export interface RunRecord {
   startedAt: string;
   updatedAt: string;
   stoppedAt?: string;
+}
+
+export interface ProjectBootstrapRecord {
+  project: ProjectRecord;
+  sessions: SessionRecord[];
+  activeSessionId: string | null;
+  sessionCapabilities: SessionCapabilitiesMapRecord;
+  recentSessionAuditEvents: AuditEventRecord[];
+  activeRun: RunRecord | null;
+  latestRun: RunRecord | null;
+  pendingApprovals: ApprovalRecord[];
 }
 
 export interface ApprovalRecord {

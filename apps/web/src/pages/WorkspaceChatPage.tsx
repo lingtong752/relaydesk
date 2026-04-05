@@ -9,6 +9,8 @@ export function WorkspaceChatPage(): JSX.Element {
   const navigate = useNavigate();
   const {
     projectId,
+    projectName,
+    projectRootPath,
     token,
     sessions,
     selectedSessionId,
@@ -97,11 +99,14 @@ export function WorkspaceChatPage(): JSX.Element {
         creatingSession={creatingSession}
         newSessionProvider={newSessionProvider}
         onCreateSession={() => void handleCreateSession()}
+        onOpenProjects={() => navigate("/projects")}
         onProviderChange={setNewSessionProvider}
         onSelectSession={(sessionId) => {
           clearChatError();
           selectSession(sessionId);
         }}
+        projectName={projectName}
+        projectRootPath={projectRootPath}
         selectedSessionId={selectedSessionId}
         sessionCountLabel={sessionCountLabel}
         sessions={sessions}

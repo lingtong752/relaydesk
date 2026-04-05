@@ -31,6 +31,16 @@ function createWorkspaceContext(): ReturnType<typeof useProjectWorkspace> {
         updatedAt: "2026-03-28T10:00:00.000Z"
       }
     ],
+    activeSessionId: "session-1",
+    sessionCapabilities: {
+      "session-1": {
+        canSendMessages: true,
+        canResume: false,
+        canStartRuns: true,
+        canAttachTerminal: true
+      }
+    },
+    recentSessionAuditEvents: [],
     selectedSessionId: "session-1",
     selectedSession: {
       id: "session-1",
@@ -108,6 +118,9 @@ describe("WorkspaceChatPage", () => {
     );
 
     expect(markup).toContain("当前项目的协作上下文");
+    expect(markup).toContain("Projects");
+    expect(markup).toContain("Conversations");
+    expect(markup).toContain("RelayDesk Demo");
     expect(markup).toContain("会话 1");
     expect(markup).toContain("Provider: codex");
     expect(markup).toContain("跳到文件");
