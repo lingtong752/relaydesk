@@ -7,20 +7,11 @@ import type {
   SessionRecord
 } from "@shared";
 import { api } from "../../lib/api";
-
-function mergePendingApprovals(
-  current: ApprovalRecord[],
-  incoming: ApprovalRecord
-): ApprovalRecord[] {
-  const withoutIncoming = current.filter((item) => item.id !== incoming.id);
-  if (incoming.status !== "pending") {
-    return withoutIncoming;
-  }
-
-  return [incoming, ...withoutIncoming].sort((left, right) =>
-    right.createdAt.localeCompare(left.createdAt)
-  );
-}
+import {
+  getActiveRunForStatus,
+  mergePendingApprovals,
+  resolveSelectedSessionId
+} from "./bootstrapState";
 
 interface UseProjectBootstrapOptions {
   projectId: string;
@@ -84,7 +75,7 @@ export function useProjectBootstrap({
     }
 
     setLatestRun(run);
-    setActiveRun(["running", "waiting_human", "paused"].includes(run.status) ? run : null);
+    setActiveRun(getActiveRunForStatus(run));
   }
 
   function handleApprovalUpdate(approval: ApprovalRecord): void {
@@ -138,20 +129,13 @@ export function useProjectBootstrap({
         setActiveRun(response.activeRun);
         setLatestRun(response.latestRun ?? response.activeRun);
         setPendingApprovals(response.pendingApprovals);
-        setSelectedSessionId((current) => {
-          if (
-            response.activeSessionId &&
-            response.sessions.some((session) => session.id === response.activeSessionId)
-          ) {
-            return response.activeSessionId;
-          }
-
-          if (current && response.sessions.some((session) => session.id === current)) {
-            return current;
-          }
-
-          return response.sessions[0]?.id ?? "";
-        });
+        setSelectedSessionId((current) =>
+          resolveSelectedSessionId({
+            currentSelectedSessionId: current,
+            activeSessionId: response.activeSessionId,
+            sessions: response.sessions
+          })
+        );
         setWorkspaceError(null);
       })
       .catch((requestError) => {
