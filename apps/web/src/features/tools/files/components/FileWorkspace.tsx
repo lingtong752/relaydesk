@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionRecord, WorkspaceFileContent, WorkspaceFileEntry } from "@shared";
 import { api } from "../../../../lib/api";
 import {
@@ -8,7 +8,9 @@ import {
 } from "../../../../lib/sessionRuntime";
 import { EmptyState } from "../../../../shared/ui/EmptyState";
 import { SectionHeader } from "../../../../shared/ui/SectionHeader";
-import { CodeEditor } from "./CodeEditor";
+const LazyCodeEditor = lazy(async () =>
+  import("./CodeEditor").then((module) => ({ default: module.CodeEditor }))
+);
 
 interface FileWorkspaceProps {
   boundSession?: SessionRecord | null;
@@ -540,22 +542,24 @@ export function FileWorkspace({
             </div>
           </div>
 
-          <CodeEditor
-            disabled={!selectedTab}
-            filePath={selectedTab?.file.path}
-            onChange={(value) => {
-              if (!selectedTab) {
-                return;
-              }
+          <Suspense fallback={<div className="code-editor-loading">编辑器模块加载中...</div>}>
+            <LazyCodeEditor
+              disabled={!selectedTab}
+              filePath={selectedTab?.file.path}
+              onChange={(value) => {
+                if (!selectedTab) {
+                  return;
+                }
 
-              updateTabDraft(selectedTab.file.path, value);
-            }}
-            onSave={() => {
-              void handleSaveFile();
-            }}
-            placeholderText="选择一个文本文件后开始编辑"
-            value={selectedTab?.draft ?? ""}
-          />
+                updateTabDraft(selectedTab.file.path, value);
+              }}
+              onSave={() => {
+                void handleSaveFile();
+              }}
+              placeholderText="选择一个文本文件后开始编辑"
+              value={selectedTab?.draft ?? ""}
+            />
+          </Suspense>
         </div>
       </div>
     </section>
