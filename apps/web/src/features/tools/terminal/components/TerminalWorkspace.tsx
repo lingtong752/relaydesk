@@ -7,7 +7,7 @@ import {
   getSessionStatusLabel
 } from "../../../../lib/sessionRuntime";
 import { connectTerminal, type TerminalClient, type TerminalEvent } from "../../../../lib/terminal";
-import { normalizeTerminalOutput } from "../../../../lib/terminalOutput";
+import { appendTerminalOutput, normalizeTerminalOutput } from "../../../../lib/terminalOutput";
 
 interface TerminalWorkspaceProps {
   focusSourceSessionId?: string;
@@ -273,7 +273,7 @@ export function TerminalWorkspace({
             updateSessionState(sessionId, (session) => ({
               ...session,
               session: event.payload.session,
-              output: event.payload.backlog,
+              output: appendTerminalOutput("", event.payload.backlog),
               status: "connected",
               error: null
             }));
@@ -283,7 +283,7 @@ export function TerminalWorkspace({
           if (event.type === "terminal.output") {
             updateSessionState(sessionId, (session) => ({
               ...session,
-              output: `${session.output}${event.payload.data}`
+              output: appendTerminalOutput(session.output, event.payload.data)
             }));
             return;
           }
@@ -293,7 +293,10 @@ export function TerminalWorkspace({
               ...session,
               client: null,
               status: "exited",
-              output: `${session.output}\n\n[terminal exited] code=${event.payload.exitCode} signal=${event.payload.signal ?? "none"}\n`
+              output: appendTerminalOutput(
+                session.output,
+                `\n\n[terminal exited] code=${event.payload.exitCode} signal=${event.payload.signal ?? "none"}\n`
+              )
             }));
             return;
           }

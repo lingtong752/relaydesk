@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTerminalOutput } from "./terminalOutput";
+import {
+  appendTerminalOutput,
+  normalizeTerminalOutput,
+  TERMINAL_OUTPUT_TRUNCATION_NOTICE
+} from "./terminalOutput";
 
 describe("normalizeTerminalOutput", () => {
   it("removes ANSI styling and OSC metadata from terminal output", () => {
@@ -24,5 +28,24 @@ describe("normalizeTerminalOutput", () => {
     expect(normalizeTerminalOutput("bytedance@host  ~/Desktop/demo   main")).toBe(
       "bytedance@host > ~/Desktop/demo > git: main"
     );
+  });
+});
+
+describe("appendTerminalOutput", () => {
+  it("appends output when below the configured limit", () => {
+    expect(appendTerminalOutput("hello", " world", { maxChars: 32, retainChars: 24 })).toBe("hello world");
+  });
+
+  it("keeps only the latest output slice once the limit is exceeded", () => {
+    expect(appendTerminalOutput("abcd", "efgh", { maxChars: 6, retainChars: 4 })).toBe(
+      `${TERMINAL_OUTPUT_TRUNCATION_NOTICE}efgh`
+    );
+  });
+
+  it("keeps a single truncation notice across repeated trimming", () => {
+    const once = appendTerminalOutput("abcd", "efgh", { maxChars: 6, retainChars: 4 });
+    const twice = appendTerminalOutput(once, "ijkl", { maxChars: 6, retainChars: 4 });
+
+    expect(twice).toBe(`${TERMINAL_OUTPUT_TRUNCATION_NOTICE}ijkl`);
   });
 });

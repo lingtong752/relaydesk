@@ -1,4 +1,8 @@
 const ESC = "\u001b";
+const DEFAULT_MAX_TERMINAL_OUTPUT_CHARS = 120_000;
+const DEFAULT_RETAIN_TERMINAL_OUTPUT_CHARS = 96_000;
+export const TERMINAL_OUTPUT_TRUNCATION_NOTICE =
+  "[relaydesk] Earlier terminal output has been trimmed to keep this tab responsive.\n";
 const PRIVATE_USE_GLYPH_REPLACEMENTS = new Map<string, string>([
   ["\uE0A0", "git:"],
   ["\uE0A1", "branch:"],
@@ -131,4 +135,32 @@ export function normalizeTerminalOutput(rawOutput: string): string {
 
   lines.push(currentLine.join(""));
   return normalizeTerminalGlyphs(lines.join("\n"));
+}
+
+export function appendTerminalOutput(
+  currentOutput: string,
+  nextOutputChunk: string,
+  options: {
+    maxChars?: number;
+    retainChars?: number;
+  } = {}
+): string {
+  const maxChars = options.maxChars ?? DEFAULT_MAX_TERMINAL_OUTPUT_CHARS;
+  const retainChars = Math.min(
+    options.retainChars ?? DEFAULT_RETAIN_TERMINAL_OUTPUT_CHARS,
+    maxChars
+  );
+  const hasTruncationNotice = currentOutput.startsWith(TERMINAL_OUTPUT_TRUNCATION_NOTICE);
+  const normalizedCurrent = hasTruncationNotice
+    ? currentOutput.slice(TERMINAL_OUTPUT_TRUNCATION_NOTICE.length)
+    : currentOutput;
+  const combined = `${normalizedCurrent}${nextOutputChunk}`;
+
+  if (combined.length <= maxChars) {
+    return hasTruncationNotice ? `${TERMINAL_OUTPUT_TRUNCATION_NOTICE}${combined}` : combined;
+  }
+
+  return `${TERMINAL_OUTPUT_TRUNCATION_NOTICE}${combined.slice(
+    Math.max(0, combined.length - retainChars)
+  )}`;
 }
