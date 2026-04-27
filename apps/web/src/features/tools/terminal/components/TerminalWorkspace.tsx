@@ -56,7 +56,7 @@ function getSourceSessionRuntimeLabel(
 
 function getTerminalBackendLabel(session: TerminalSessionRecord): string {
   if (session.backendType === "provider_cli") {
-    return session.attachMode === "resume_bridge" ? "Provider CLI bridge" : "Provider CLI";
+    return session.attachMode === "resume_bridge" ? "Provider CLI 桥接 (半双工)" : "Provider CLI";
   }
 
   return "项目 shell";
@@ -71,6 +71,9 @@ function getTerminalCapabilityLabel(session: TerminalSessionRecord): string {
 }
 
 function getTerminalTabTitle(session: TerminalSessionRecord): string {
+  if (session.backendType === "provider_cli" && session.attachMode === "resume_bridge") {
+    return `[桥接] ${session.sourceSession?.provider ?? "CLI"}`;
+  }
   return session.sourceSession?.title ?? session.shell.split("/").at(-1) ?? "shell";
 }
 

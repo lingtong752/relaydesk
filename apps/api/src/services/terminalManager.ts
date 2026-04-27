@@ -282,15 +282,20 @@ export class TerminalManager {
 
     if (session.backendType === "provider_cli" && session.sourceSession) {
       session.buffer = [
-        `[RelayDesk] provider terminal attached to ${session.sourceSession.provider}.`,
-        session.attachMode === "resume_bridge"
-          ? "[RelayDesk] current mode: resume bridge. Live TTY attach will be added in a later iteration."
-          : `[RelayDesk] current mode: ${session.attachMode ?? "unknown"}.`,
-        session.fallbackReason ? `[RelayDesk] note: ${session.fallbackReason}` : null,
-        ""
+        `\x1b[36m╭────────────────────────────────────────────────────────╮\x1b[0m`,
+        `\x1b[36m│\x1b[0m 🔄 \x1b[1mRelayDesk CLI Bridge\x1b[0m                                 \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m Attached to: ${(session.sourceSession.provider || "unknown").padEnd(41)} \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m Mode: Resume Bridge (Local Shell)                      \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m                                                        \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m \x1b[33mNote: Live TTY attach is coming in a future update.\x1b[0m    \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m You can use this shell to run commands, view logs,     \x1b[36m│\x1b[0m`,
+        `\x1b[36m│\x1b[0m and assist the session in the web UI.                  \x1b[36m│\x1b[0m`,
+        `\x1b[36m╰────────────────────────────────────────────────────────╯\x1b[0m`,
+        session.fallbackReason ? `\x1b[33m[RelayDesk] Note: ${session.fallbackReason}\x1b[0m` : "",
+        "\r\n"
       ]
-        .filter(Boolean)
-        .join("\n");
+        .filter((line) => line !== "")
+        .join("\r\n");
     }
 
     backend.onData((chunk) => {
